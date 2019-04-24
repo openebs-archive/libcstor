@@ -1,3 +1,6 @@
 ACLOCAL_AMFLAGS= -I m4
 
+#Enable UZFS support
+CFLAG=-D_UZFS
+
 SUBDIRS = src

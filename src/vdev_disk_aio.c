@@ -19,9 +19,12 @@
  * CDDL HEADER END
  */
 
+#define _GNU_SOURCE
 #include <scsi/scsi.h>
 #undef VERIFY	/* VERIFY macro name collision - we want the ZFS macro */
 
+#undef  _GNU_SOURCE
+#include <fcntl.h>
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>

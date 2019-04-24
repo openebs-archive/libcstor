@@ -28,6 +28,7 @@
 #include <sys/zap.h>
 #include <sys/uzfs_zvol.h>
 #include <uzfs_zap.h>
+#include <sys/zvol.h>
 
 /*
  * update/add key-value entry in zvol zap object

@@ -2,7 +2,10 @@ ACLOCAL_AMFLAGS = -I m4
 
 lib_LTLIBRARIES = libzrepl.la
 
-DEFAULT_INCLUDES = ../include
+DEFAULT_INCLUDES = -I$(top_srcdir)/config.h	\
+	-I../include	\
+	${SPL_SRC} 	\
+	${ZFS_SRC}
 
 EXTRA_DIST = \
 			 data_conn.c \
@@ -19,6 +22,6 @@ EXTRA_DIST = \
 
 nodist_libzrepl_la_SOURCES = $(EXTRA_DIST)
 
-libzrepl_la_LIBADD =
+libzrepl_la_LIBADD = -laio -ldl -lm -ljson-c
 
 libzrepl_la_LDFLAGS = -version-info 2:0:0

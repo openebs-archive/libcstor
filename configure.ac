@@ -27,6 +27,8 @@ AC_HEADER_STDC
 
 #AC_CHECK_HEADERS(fcntl.h limits.h strings.h syslog.h unistd.h [sys/cdefs.h] [sys/param.h] stdarg.h locale.h xlocale.h endian.h)
 #AC_CHECK_HEADER(inttypes.h,[AC_DEFINE([JSON_C_HAVE_INTTYPES_H],[1],[Public define for json_inttypes.h])])
+ZREPL_AC_DEBUG
+ZREPL_AC_CONFIG_ZFS
 
 AC_CONFIG_FILES([
                  Makefile
