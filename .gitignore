@@ -33,5 +33,4 @@ config.*
 compile
 depcomp
 aclocal.m4
-COPYING
 
