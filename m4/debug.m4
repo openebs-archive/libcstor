@@ -1,4 +1,4 @@
-AC_DEFUN([ZREPL_AC_DEBUG], [
+AC_DEFUN([CSTOR_AC_DEBUG], [
 	AC_MSG_CHECKING([whether assertion support will be enabled])
 	AC_ARG_ENABLE([debug],
 		[AS_HELP_STRING([--enable-debug],

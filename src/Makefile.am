@@ -5,7 +5,7 @@ AM_CFLAGS=-D_UZFS
 
 AM_CPPFLAGS=-D_GNU_SOURCE
 
-lib_LTLIBRARIES = libzrepl.la
+lib_LTLIBRARIES = libcstor.la
 
 DEFAULT_INCLUDES = -I../include	\
 	${SPL_SRC} 	\
@@ -24,8 +24,8 @@ EXTRA_DIST = \
 			 vdev_disk_aio.c \
 			 zrepl_mgmt.c
 
-nodist_libzrepl_la_SOURCES = $(EXTRA_DIST)
+nodist_libcstor_la_SOURCES = $(EXTRA_DIST)
 
-libzrepl_la_LIBADD = -laio -ldl -lm -ljson-c
+libcstor_la_LIBADD = -laio -ldl -lm -ljson-c
 
-libzrepl_la_LDFLAGS = -version-info 2:0:0
+libcstor_la_LDFLAGS = -version-info 2:0:0

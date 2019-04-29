@@ -1,6 +1,6 @@
 AC_PREREQ(2.69)
 
-AC_INIT([libzrepl], 0.0.0, [user@xyz.com])
+AC_INIT([libcstor], 0.0.0)
 AC_CONFIG_MACRO_DIRS([m4])
 AM_MAINTAINER_MODE
 
@@ -26,10 +26,8 @@ AC_PROG_CC_C99
 AC_CONFIG_HEADER(config.h)
 AC_HEADER_STDC
 
-#AC_CHECK_HEADERS(fcntl.h limits.h strings.h syslog.h unistd.h [sys/cdefs.h] [sys/param.h] stdarg.h locale.h xlocale.h endian.h)
-#AC_CHECK_HEADER(inttypes.h,[AC_DEFINE([JSON_C_HAVE_INTTYPES_H],[1],[Public define for json_inttypes.h])])
-ZREPL_AC_DEBUG
-ZREPL_AC_CONFIG_ZFS
+CSTOR_AC_DEBUG
+CSTOR_AC_CONFIG_ZFS
 
 AC_CONFIG_FILES([
                  Makefile

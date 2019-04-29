@@ -1,4 +1,4 @@
-AC_DEFUN([ZREPL_AC_CONFIG_ZFS], [
+AC_DEFUN([CSTOR_AC_CONFIG_ZFS], [
     AC_ARG_WITH([zfs-headers],
         AC_HELP_STRING([--with-zfs-headers=dir],
             [include zfs headers]),
