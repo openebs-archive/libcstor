@@ -1,9 +1,13 @@
 ACLOCAL_AMFLAGS = -I m4
 
+#Enable UZFS support
+AM_CFLAGS=-D_UZFS
+
+AM_CPPFLAGS=-D_GNU_SOURCE
+
 lib_LTLIBRARIES = libzrepl.la
 
-DEFAULT_INCLUDES = -I$(top_srcdir)/config.h	\
-	-I../include	\
+DEFAULT_INCLUDES = -I../include	\
 	${SPL_SRC} 	\
 	${ZFS_SRC}
 

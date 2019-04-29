@@ -21,7 +21,6 @@
 #include <sys/dsl_dataset.h>
 #include <uzfs_io.h>
 #include <zrepl_mgmt.h>
-#include <sys/zvol.h>
 
 int uzfs_write_size;
 

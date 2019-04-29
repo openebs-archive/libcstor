@@ -26,7 +26,6 @@
 #include <uzfs_io.h>
 #include <uzfs_zap.h>
 #include <uzfs_rebuilding.h>
-#include <sys/zvol.h>
 
 static int uzfs_fd_rand = -1;
 kmutex_t zvol_list_mutex;

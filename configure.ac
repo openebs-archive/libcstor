@@ -2,6 +2,7 @@ AC_PREREQ(2.69)
 
 AC_INIT([libzrepl], 0.0.0, [user@xyz.com])
 AC_CONFIG_MACRO_DIRS([m4])
+AM_MAINTAINER_MODE
 
 AM_INIT_AUTOMAKE
 
