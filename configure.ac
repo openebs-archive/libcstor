@@ -32,6 +32,8 @@ CSTOR_AC_CONFIG_ZFS
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
+                 include/Makefile
+                 include/sys/Makefile
 ])
 
 AC_OUTPUT
