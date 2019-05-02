@@ -3,4 +3,4 @@ AUTOMAKE_OPTIONS = foreign
 
 DEFAULT_INCLUDES = -include ${top_builddir}/config.h
 
-SUBDIRS = src
+SUBDIRS = src include
