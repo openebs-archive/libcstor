@@ -7,7 +7,9 @@ AM_CPPFLAGS=-D_GNU_SOURCE
 
 lib_LTLIBRARIES = libcstor.la
 
-DEFAULT_INCLUDES = -I../include	\
+DEFAULT_INCLUDES =	\
+	-include ${top_builddir}/config.h	\
+	-I../include	\
 	${SPL_SRC} 	\
 	${ZFS_SRC}
 
