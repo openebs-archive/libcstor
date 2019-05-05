@@ -7,7 +7,8 @@ AC_DEFUN([CSTOR_AC_DEBUG], [
 		[enable_debug=no])
 
     AS_IF([test "x$enable_debug" == xyes], [
-        DEBUG_FLAGS=-DDEBUG
+        DEBUG_FLAGS="-DDEBUG -Werror"
+        AC_DEFINE(ZFS_DEBUG, 1, [libcstor debugging enabled])
     ],[
         DEBUG_FLAGS=-DNDEBUG
     ])
