@@ -414,6 +414,7 @@ uzfs_zinfo_init(zvol_state_t *zv, const char *ds_name, nvlist_t *create_props)
 
 	STAILQ_INIT(&zinfo->complete_queue);
 	STAILQ_INIT(&zinfo->fd_list);
+	STAILQ_INIT(&zinfo->rebuild_scanner_list);
 	uzfs_zinfo_init_mutex(zinfo);
 
 	strlcpy(zinfo->name, ds_name, MAXNAMELEN);
