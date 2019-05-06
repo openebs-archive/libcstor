@@ -45,15 +45,17 @@ install:
     - sh autogen.sh
     - ./configure
     - make -j4
+    - cd ..
+    # we need cstor code
+    - git clone https://github.com/openebs/cstor.git
     # return to libcstor code
-    - cd ../libcstor
+    - cd libcstor
     - sh autogen.sh
     - ./configure --enable-debug --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
     - make -j4
     - sudo make install
     - sudo ldconfig
     - cd ..
-    - git clone https://github.com/openebs/cstor.git
     - cd cstor
     - git checkout develop
     - sh autogen.sh
