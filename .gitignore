@@ -11,6 +11,8 @@ cscope.*
 *.[oa]
 *.lo
 *.la
+*.i
+*.s
 *.mod.c
 *~
 *.swp
