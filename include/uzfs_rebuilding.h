@@ -61,6 +61,8 @@ int uzfs_zvol_release_internal_clone(zvol_state_t *zv,
  */
 int uzfs_destroy_all_internal_snapshots(zvol_state_t *zv);
 boolean_t is_stale_clone(zvol_state_t *);
+int uzfs_destroy_all_iosnap_snapshots(zvol_state_t *zv);
+boolean_t is_stale_clone(zvol_state_t *);
 
 #ifdef __cplusplus
 }
