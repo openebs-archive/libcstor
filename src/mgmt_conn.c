@@ -361,22 +361,23 @@ zinfo_destroy_cb(zvol_info_t *zinfo)
  */
 static int
 reply_nodata(uzfs_mgmt_conn_t *conn, zvol_op_status_t status,
-    int opcode, uint64_t io_seq)
+    zvol_io_hdr_t *in_hdr)
 {
 	zvol_io_hdr_t *hdrp;
 	struct epoll_event ev;
 
 	if (status != ZVOL_OP_STATUS_OK) {
 		LOGERRCONN(conn, "Error reply with status %d for OP %d",
-		    status, opcode);
+		    status, in_hdr->opcode);
 	} else {
-		DBGCONN(conn, "Reply without payload for OP %d", opcode);
+		DBGCONN(conn, "Reply without payload for OP %d",
+		    in_hdr->opcode);
 	}
 
 	hdrp = kmem_zalloc(sizeof (*hdrp), KM_SLEEP);
-	hdrp->version = REPLICA_VERSION;
-	hdrp->opcode = opcode;
-	hdrp->io_seq = io_seq;
+	hdrp->version = in_hdr->version;
+	hdrp->opcode = in_hdr->opcode;
+	hdrp->io_seq = in_hdr->io_seq;
 	hdrp->status = status;
 	hdrp->len = 0;
 	ASSERT3P(conn->conn_buf, ==, NULL);
@@ -527,7 +528,7 @@ uzfs_zvol_mgmt_get_handshake_info(zvol_io_hdr_t *in_hdr, const char *name,
 	LOG_INFO("Volume:%s has zvol_guid:%lu", zinfo->name, zinfo->zvol_guid);
 
 	bzero(out_hdr, sizeof (*out_hdr));
-	out_hdr->version = REPLICA_VERSION;
+	out_hdr->version = in_hdr->version;
 	out_hdr->opcode = in_hdr->opcode; // HANDSHAKE or PREPARE_FOR_REBUILD
 	out_hdr->io_seq = in_hdr->io_seq;
 	out_hdr->len = sizeof (*mgmt_ack);
@@ -560,8 +561,7 @@ uzfs_zvol_mgmt_do_handshake(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	zvol_io_hdr_t	hdr;
 	if (uzfs_zvol_mgmt_get_handshake_info(hdrp, name, zinfo, &hdr,
 	    &mgmt_ack) != 0)
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp->opcode,
-		    hdrp->io_seq));
+		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	return (reply_data(conn, &hdr, &mgmt_ack, sizeof (mgmt_ack)));
 }
 
@@ -575,7 +575,7 @@ uzfs_zvol_rebuild_status(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	status_ack.state = uzfs_zvol_get_status(zinfo->main_zv);
 
 	bzero(&hdr, sizeof (hdr));
-	hdr.version = REPLICA_VERSION;
+	hdr.version = hdrp->version;
 	hdr.opcode = hdrp->opcode;
 	hdr.io_seq = hdrp->io_seq;
 	hdr.len = sizeof (status_ack);
@@ -616,7 +616,7 @@ uzfs_zvol_stats(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp, zvol_info_t *zinfo)
 	    zv_objset->os_dsl_dataset->ds_dir)->dd_uncompressed_bytes;
 
 	bzero(&hdr, sizeof (hdr));
-	hdr.version = REPLICA_VERSION;
+	hdr.version = hdrp->version;
 	hdr.opcode = hdrp->opcode;
 	hdr.io_seq = hdrp->io_seq;
 	hdr.len = sizeof (zvol_op_stat_t);
@@ -715,7 +715,7 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
 	uint64_t total_len;
 	char err_msg[128];
 
-	snapname = kmem_alloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
+	snapname = kmem_zalloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
 	jarray = json_object_new_array();
 
 	while (error == 0) {
@@ -831,8 +831,7 @@ finish_async_tasks(void)
 				    async_task->response_length);
 			} else
 				rc = reply_nodata(async_task->conn,
-				    async_task->status, async_task->hdr.opcode,
-				    async_task->hdr.io_seq);
+				    async_task->status, &async_task->hdr);
 		}
 		SLIST_REMOVE(&async_tasks, async_task, async_task, task_next);
 		free_async_task(async_task);
@@ -1183,10 +1182,8 @@ uzfs_zvol_rebuild_dw_replica_start(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	int rc;
 	rc = uzfs_zinfo_rebuild_start_threads(mack, zinfo, rebuild_op_cnt);
 	if (rc != 0)
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp->opcode,
-		    hdrp->io_seq));
-	return (reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp->opcode,
-	    hdrp->io_seq));
+		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
+	return (reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp));
 }
 
 /*
@@ -1234,8 +1231,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	/* Invalid payload size */
 	if ((payload_size == 0) || (payload_size % sizeof (mgmt_ack_t)) != 0) {
 		LOG_ERR("rebuilding failed.. response is invalid");
-		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-		    hdrp->opcode, hdrp->io_seq);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
@@ -1250,8 +1246,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		}
 		else
 			LOG_ERR("rebuilding failed..");
-		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-		    hdrp->opcode, hdrp->io_seq);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
@@ -1263,8 +1258,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		LOG_ERR("rebuilding failed for %s due to improper zinfo "
 		    "status %d", zinfo->name, status);
 		uzfs_zinfo_drop_refcnt(zinfo);
-		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-		    hdrp->opcode, hdrp->io_seq);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
@@ -1275,8 +1269,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		LOG_ERR("rebuilding failed for %s due to improper rebuild "
 		    "status %d", zinfo->name, rstatus);
 		uzfs_zinfo_drop_refcnt(zinfo);
-		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-		    hdrp->opcode, hdrp->io_seq);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
@@ -1302,13 +1295,11 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		if (rc != 0) {
 			LOG_ERR("Rebuild from clone for vol %s "
 			    "failed", zinfo->name);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		} else {
 			LOG_INFO("Rebuild started from clone for vol "
 			    "%s", zinfo->name);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_OK,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp);
 		}
 		uzfs_zinfo_drop_refcnt(zinfo);
 		goto end;
@@ -1331,8 +1322,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		    rebuild_op_cnt, zinfo->checkpointed_ionum,
 		    max_ioseq);
 		uzfs_zinfo_drop_refcnt(zinfo);
-		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-		    hdrp->opcode, hdrp->io_seq);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
@@ -1384,8 +1374,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 	case ZVOL_OPCODE_REPLICA_STATUS:
 	case ZVOL_OPCODE_STATS:
 		if (payload_size == 0 || payload_size >= MAX_NAME_LEN) {
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		strlcpy(zvol_name, payload, payload_size);
@@ -1393,8 +1382,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 
 		if ((zinfo = uzfs_zinfo_lookup(zvol_name)) == NULL) {
 			LOGERRCONN(conn, "Unknown zvol: %s", zvol_name);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		/*
@@ -1406,8 +1394,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOGERRCONN(conn, "Target used invalid connection for "
 			    "zvol %s", zvol_name);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 
@@ -1439,8 +1426,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 	case ZVOL_OPCODE_SNAP_DESTROY:
 	case ZVOL_OPCODE_SNAP_LIST:
 		if (payload_size == 0 || payload_size >= MAX_NAME_LEN) {
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		strlcpy(zvol_name, payload, payload_size);
@@ -1451,7 +1437,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 				LOG_ERR("Invalid snapshot name: %s",
 				    zvol_name);
 				rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-				    hdrp->opcode, hdrp->io_seq);
+				    hdrp);
 				break;
 			}
 			*snap++ = '\0';
@@ -1459,16 +1445,14 @@ process_message(uzfs_mgmt_conn_t *conn)
 		/* ref will be released when async command has finished */
 		if ((zinfo = uzfs_zinfo_lookup(zvol_name)) == NULL) {
 			LOGERRCONN(conn, "Unknown zvol: %s", zvol_name);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		if (zinfo->mgmt_conn != conn) {
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOGERRCONN(conn, "Target used invalid connection for "
 			    "zvol %s to take %s snapshot", zvol_name, snap);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		if (hdrp->opcode == ZVOL_OPCODE_SNAP_LIST) {
@@ -1492,8 +1476,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOG_ERR("zvol %s is not healthy to take %s snapshot",
 			    zvol_name, snap);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		if (hdrp->opcode == ZVOL_OPCODE_SNAP_CREATE) {
@@ -1509,8 +1492,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 
 	case ZVOL_OPCODE_RESIZE:
 		if (payload_size != sizeof (*resize_data)) {
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		resize_data = payload;
@@ -1519,16 +1501,14 @@ process_message(uzfs_mgmt_conn_t *conn)
 		if ((zinfo = uzfs_zinfo_lookup(resize_data->volname)) == NULL) {
 			LOGERRCONN(conn, "Unknown zvol: %s",
 			    resize_data->volname);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		if (zinfo->mgmt_conn != conn) {
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOGERRCONN(conn, "Target used invalid connection for "
 			    "zvol %s", resize_data->volname);
-			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-			    hdrp->opcode, hdrp->io_seq);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
 		LOGCONN(conn, "Resize zvol %s to %lu bytes", zinfo->name,
@@ -1546,8 +1526,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 	default:
 		LOGERRCONN(conn, "Message with unknown OP code %d",
 		    hdrp->opcode);
-		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp->opcode,
-		    hdrp->io_seq);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		break;
 	}
 	kmem_free(hdrp, sizeof (*hdrp));
@@ -1566,6 +1545,7 @@ move_to_next_state(uzfs_mgmt_conn_t *conn)
 {
 	struct epoll_event ev;
 	zvol_io_hdr_t *hdrp;
+	zvol_io_hdr_t hdr = { 0 };
 	uint16_t vers;
 	int rc = 0;
 
@@ -1595,11 +1575,17 @@ move_to_next_state(uzfs_mgmt_conn_t *conn)
 		vers = *((uint16_t *)conn->conn_buf);
 		kmem_free(conn->conn_buf, sizeof (uint16_t));
 		conn->conn_buf = NULL;
-		if (vers != REPLICA_VERSION) {
+		if ((vers > REPLICA_VERSION) ||
+		    (vers < MIN_SUPPORTED_REPLICA_VERSION)) {
 			LOGERRCONN(conn, "Invalid replica protocol version %d",
 			    vers);
+			/*
+			 * In case of version mismatch, max version that uzfs
+			 * supports will be sent
+			 */
+			hdr.version = REPLICA_VERSION;
 			rc = reply_nodata(conn, ZVOL_OP_STATUS_VERSION_MISMATCH,
-			    0, 0);
+			    &hdr);
 			/* override the default next state from reply_nodata */
 			conn->conn_state = CS_CLOSE;
 		} else {
