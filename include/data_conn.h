@@ -71,8 +71,6 @@ int uzfs_zvol_create_internal_snapshot(zvol_state_t *zv, zvol_state_t **snap_zv,
 void signal_fds_related_to_zinfo(zvol_info_t *zinfo);
 void quiesce_wait(zvol_info_t *zinfo);
 
-int uzfs_zvol_create_internal_snapshot(zvol_state_t *zv, zvol_state_t **snap_zv,
-    uint64_t io_num);
 int uzfs_zvol_handle_rebuild_snap_done(zvol_io_hdr_t *, int, zvol_info_t *);
 
 #ifdef __cplusplus
