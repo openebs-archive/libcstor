@@ -389,12 +389,36 @@ again:
 	return (ret);
 }
 
+typedef boolean_t (*uzfs_snapname_matching_func)(char *snapname);
+
 /*
- * To destroy all internal created snapshot
- * on a dataset
+ * Return true for snaps that are internal created
  */
-int
-uzfs_destroy_all_internal_snapshots(zvol_state_t *zv)
+boolean_t
+uzfs_match_internal_snapshots(char *snapname)
+{
+	if ((strcmp(snapname, REBUILD_SNAPSHOT_SNAPNAME) == 0) ||
+	    (strncmp(snapname, IO_DIFF_SNAPNAME,
+	    sizeof (IO_DIFF_SNAPNAME) - 1) == 0))
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+/*
+ * Return true for snaps that starts with .io_snap
+ */
+boolean_t
+uzfs_match_iosnap_snapshots(char *snapname)
+{
+	if (strncmp(snapname, IO_DIFF_SNAPNAME,
+	    sizeof (IO_DIFF_SNAPNAME) - 1) == 0)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+static int
+uzfs_destroy_matching_snapshots(zvol_state_t *zv,
+    uzfs_snapname_matching_func matching_fn)
 {
 	int ret;
 	char snapname[MAXNAMELEN];
@@ -418,11 +442,9 @@ uzfs_destroy_all_internal_snapshots(zvol_state_t *zv)
 			break;
 		}
 
-		if (!(strcmp(snapname, REBUILD_SNAPSHOT_SNAPNAME) == 0) &&
-		    !(strncmp(snapname, IO_DIFF_SNAPNAME,
-		    sizeof (IO_DIFF_SNAPNAME) - 1) == 0)) {
+		/* skip destroying non-matching snaps */
+		if ((*matching_fn)(snapname) == B_FALSE)
 			continue;
-		}
 
 		ret = destroy_snapshot_zv(zv, snapname);
 		if (ret != 0) {
@@ -432,5 +454,27 @@ uzfs_destroy_all_internal_snapshots(zvol_state_t *zv)
 		}
 	}
 
+	return (ret);
+}
+
+/*
+ * To destroy all internal created snapshot
+ * on a dataset
+ */
+int
+uzfs_destroy_all_internal_snapshots(zvol_state_t *zv)
+{
+	int ret;
+	ret = uzfs_destroy_matching_snapshots(zv,
+	    uzfs_match_internal_snapshots);
+	return (ret);
+}
+
+int
+uzfs_destroy_all_iosnap_snapshots(zvol_state_t *zv)
+{
+	int ret;
+	ret = uzfs_destroy_matching_snapshots(zv,
+	    uzfs_match_iosnap_snapshots);
 	return (ret);
 }
