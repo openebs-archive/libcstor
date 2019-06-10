@@ -632,11 +632,32 @@ uzfs_zvol_handle_rebuild_snap_done(zvol_io_hdr_t *hdrp,
 }
 
 int
+uzfs_zvol_resize(zvol_state_t *zv, uint64_t newsize)
+{
+	int rc = 0;
+	uint64_t volsize = ZVOL_VOLUME_SIZE(zv);
+
+	if (volsize < newsize) {
+		LOG_INFO("resize the volume %s old size = %lu, new size = %lu",
+		    zv->zv_name, volsize, newsize);
+		rc = zvol_check_volsize(newsize, zv->zv_volblocksize);
+		if (rc == 0) {
+			rc = zvol_update_volsize(newsize, zv->zv_objset);
+			if (rc == 0)
+				zvol_size_changed(zv, newsize);
+		}
+		if (rc != 0) {
+			LOG_ERR("Failed to resize zvol %s", zv->zv_name);
+		}
+	}
+	return (rc);
+}
+
+int
 uzfs_zvol_handle_rebuild_snap_start(zvol_io_hdr_t *hdrp,
     int sfd, zvol_info_t *zinfo)
 {
 	int rc = 0;
-	uint64_t dvolsize = ZVOL_VOLUME_SIZE(zinfo->main_zv);
 	uint64_t volsize;
 
 	if (hdrp->len != sizeof (volsize)) {
@@ -648,22 +669,15 @@ uzfs_zvol_handle_rebuild_snap_start(zvol_io_hdr_t *hdrp,
 	if ((rc = uzfs_zvol_socket_read(sfd, (char *)&volsize, hdrp->len)) != 0)
 		return (rc);
 
-	if (dvolsize < volsize) {
-		LOG_INFO("resize the volume %s old size = %lu, new size = %lu",
-		    zinfo->main_zv->zv_name, dvolsize, volsize);
-		rc = zvol_check_volsize(volsize,
-		    zinfo->main_zv->zv_volblocksize);
-		if (rc == 0) {
-			rc = zvol_update_volsize(volsize,
-			    zinfo->main_zv->zv_objset);
-			if (rc == 0)
-				zvol_size_changed(zinfo->main_zv, volsize);
-		}
-		if (rc != 0) {
-			LOG_ERR("Failed to resize zvol %s",
-			    zinfo->main_zv->zv_name);
-		}
-	}
+	mutex_enter(&zinfo->main_zv->rebuild_mtx);
+	/*
+	 * In mesh rebuild, all the helping replica (including cloned volume)
+	 * will send SNAP_START op code to resize the downgraded replica. We
+	 * need to protect the resize to avoid attempting it multiple times.
+	 */
+	rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
+	mutex_exit(&zinfo->main_zv->rebuild_mtx);
+
 	return (rc);
 }
 
@@ -2310,6 +2324,11 @@ open_zvol(int fd, zvol_info_t **zinfopp)
 				LOG_ERR("Failed to create clone for rebuild");
 				goto error_ret;
 			}
+		}
+		if (uzfs_zvol_resize(zinfo->clone_zv, hdr.volsize)) {
+			LOG_ERR("Failed to resize cloned volume %s",
+			    zinfo->name);
+			goto error_ret;
 		}
 		ASSERT3P(zinfo->clone_zv, !=, NULL);
 		if (zinfo->clone_zv == NULL) {
