@@ -880,8 +880,8 @@ next_step:
 			    sfd, zinfo);
 			if (rc != 0) {
 				LOG_ERR("Rebuild snap start failed.."
-				    "for %s on fd(%d)",
-				    zinfo->name, sfd);
+				    "for %s on fd(%d) err(%d)",
+				    zinfo->name, sfd, rc);
 				goto exit;
 			}
 			continue;
