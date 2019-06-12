@@ -2318,7 +2318,7 @@ open_zvol(int fd, zvol_info_t **zinfopp)
 		 * as it will be marked healthy.
 		 */
 		if (uzfs_zvol_resize(zinfo->main_zv, hdr.volsize)) {
-			LOG_ERR("Failed to resize cloned volume %s",
+			LOG_ERR("Failed to resize main volume %s",
 			    zinfo->name);
 			goto error_ret;
 		}
