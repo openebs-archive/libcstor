@@ -351,6 +351,7 @@ uzfs_dataset_zv_create(const char *ds_name, zvol_state_t **z)
 	zv->zv_spa = spa;
 	zfs_rlock_init(&zv->zv_range_lock);
 	mutex_init(&zv->rebuild_mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zv->conf_mtx, NULL, MUTEX_DEFAULT, NULL);
 
 	strlcpy(zv->zv_name, ds_name, MAXNAMELEN);
 
@@ -366,6 +367,7 @@ disown_free:
 		dmu_objset_disown(zv->zv_objset, zv);
 free_ret:
 		mutex_destroy(&zv->rebuild_mtx);
+		mutex_destroy(&zv->conf_mtx);
 		zfs_rlock_destroy(&zv->zv_range_lock);
 		spa_close(spa, zv);
 		kmem_free(zv, sizeof (zvol_state_t));
@@ -692,6 +694,7 @@ uzfs_close_dataset(zvol_state_t *zv)
 {
 	uzfs_rele_dataset(zv);
 	mutex_destroy(&zv->rebuild_mtx);
+	mutex_destroy(&zv->conf_mtx);
 	zfs_rlock_destroy(&zv->zv_range_lock);
 	spa_close(zv->zv_spa, zv);
 	kmem_free(zv, sizeof (zvol_state_t));

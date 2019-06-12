@@ -89,6 +89,7 @@ struct zvol_state {
 	/* Don't use status directly. Use getter/setter of zvol_info */
 	zvol_status_t zv_status;		/* zvol status */
 	kmutex_t rebuild_mtx;
+	kmutex_t conf_mtx;
 	zvol_rebuild_info_t rebuild_info;
 	uint8_t zvol_workers;			/* zvol workers count */
 };

@@ -635,8 +635,10 @@ int
 uzfs_zvol_resize(zvol_state_t *zv, uint64_t newsize)
 {
 	int rc = 0;
-	uint64_t volsize = ZVOL_VOLUME_SIZE(zv);
 
+	mutex_enter(&zv->conf_mtx);
+
+	uint64_t volsize = ZVOL_VOLUME_SIZE(zv);
 	if (volsize < newsize) {
 		LOG_INFO("resize the volume %s old size = %lu, new size = %lu",
 		    zv->zv_name, volsize, newsize);
@@ -650,6 +652,8 @@ uzfs_zvol_resize(zvol_state_t *zv, uint64_t newsize)
 			LOG_ERR("Failed to resize zvol %s", zv->zv_name);
 		}
 	}
+
+	mutex_exit(&zv->conf_mtx);
 	return (rc);
 }
 
@@ -669,16 +673,11 @@ uzfs_zvol_handle_rebuild_snap_start(zvol_io_hdr_t *hdrp,
 	if ((rc = uzfs_zvol_socket_read(sfd, (char *)&volsize, hdrp->len)) != 0)
 		return (rc);
 
-	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 	/*
 	 * In mesh rebuild, all the helping replica (including cloned volume)
-	 * will send SNAP_START op code to resize the downgraded replica. We
-	 * need to protect the resize to avoid attempting it multiple times.
+	 * will send SNAP_START op code to resize the downgraded replica.
 	 */
-	rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
-	mutex_exit(&zinfo->main_zv->rebuild_mtx);
-
-	return (rc);
+	return (uzfs_zvol_resize(zinfo->main_zv, volsize));
 }
 
 void
@@ -2314,6 +2313,15 @@ open_zvol(int fd, zvol_info_t **zinfopp)
 	if (status == ZVOL_STATUS_HEALTHY) {
 		ASSERT3P(zinfo->snapshot_zv, ==, NULL);
 		ASSERT3P(zinfo->clone_zv, ==, NULL);
+		/*
+		 * resize the main volume in case of single replica
+		 * as it will be marked healthy.
+		 */
+		if (uzfs_zvol_resize(zinfo->main_zv, hdr.volsize)) {
+			LOG_ERR("Failed to resize cloned volume %s",
+			    zinfo->name);
+			goto error_ret;
+		}
 	} else {
 		if (zinfo->snapshot_zv == NULL) {
 			ASSERT3P(zinfo->clone_zv, ==, NULL);
