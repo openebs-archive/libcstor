@@ -64,7 +64,7 @@ install:
 script:
     export FIO_SRCDIR=$PWD/../fio;
     sudo bash ./print_debug_info.sh &
-    sudo bash ../libcstor/tests/cbtest/script/test_uzfs.sh -T all || travis_terminate 1;
+    sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
 after_failure:
     - find /var/tmp/test_results/current/log -type f -name '*' -printf "%f\n" -exec cut -c -$CSTOR_TEST_TRAVIS_LOG_MAX_LENGTH {} \;
 after_success:
