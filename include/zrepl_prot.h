@@ -99,8 +99,12 @@ struct zvol_io_hdr {
 		/* IOnum from which rebuild need to be done */
 		uint64_t	checkpointed_io_seq;
 	};
-	/* only used for read/write */
-	uint64_t	offset;
+	union {
+		/* only used for read/write */
+		uint64_t	offset;
+		/* only used for zvol open opcode */
+		uint64_t	volsize;
+	};
 	/*
 	 * Length of data in payload, with following exceptions:
 	 *  1) for read request: size of data to read (payload has zero length)

@@ -74,6 +74,7 @@ void quiesce_wait(zvol_info_t *zinfo);
 int uzfs_zvol_handle_rebuild_snap_done(zvol_io_hdr_t *, int, zvol_info_t *);
 int uzfs_zvol_handle_rebuild_snap_start(zvol_io_hdr_t *, int, zvol_info_t *);
 
+int uzfs_zvol_resize(zvol_state_t *zv, uint64_t newsize);
 #ifdef __cplusplus
 }
 #endif
