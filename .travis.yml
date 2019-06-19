@@ -51,7 +51,7 @@ install:
     # we need cstor code
     - git clone https://github.com/openebs/cstor.git
     - cd cstor
-    - [ ! -z ${TRAVIS_TAG} ] && git checkout ${TRAVIS_TAG} || git checkout develop
+    - if [ ! -z ${TRAVIS_TAG} ]; then git checkout ${TRAVIS_TAG}; else git checkout develop; fi
     - git branch
     - cd ..
     # return to libcstor code
