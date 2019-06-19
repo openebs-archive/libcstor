@@ -921,6 +921,16 @@ next_step:
 				zinfo->quiesce_requested = 1;
 			}
 			mutex_exit(&zinfo->main_zv->rebuild_mtx);
+
+			hdr.opcode = ZVOL_OPCODE_AFS_DONE;
+			rc = uzfs_zvol_socket_write(sfd, (char *)&hdr,
+			    sizeof (hdr));
+			if (rc != 0) {
+				LOG_ERR("Socket rebuild afs done write failed"
+				    "for %s on fd(%d) err(%d)",
+				    zvol_state->zv_name, sfd, rc);
+				goto exit;
+			}
 			/*
 			 * Wait for all outstanding IOs to be flushed
 			 * to disk before making further progress
@@ -1574,7 +1584,7 @@ uzfs_zvol_rebuild_scanner(void *arg)
 	boolean_t	all_snap_done = B_FALSE;
 	char		*payload = NULL;
 	uint64_t	checkpointed_io_seq = 0;
-	uint64_t	payload_size = 0;
+	uint64_t	payload_size = 0, io_seq;
 	char		*snap_name;
 	zvol_rebuild_scanner_info_t	*warg = NULL;
 	char		*at_ptr = NULL;
@@ -1670,9 +1680,12 @@ read_socket:
 			    == 1)
 				sleep(5);
 #endif
+retry:
+			io_seq = hdr.checkpointed_io_seq;
+
 			if (snap_zv == NULL) {
 				rc = uzfs_get_snap_zv_ionum(zinfo,
-				    hdr.checkpointed_io_seq, &snap_zv);
+				    io_seq, &snap_zv);
 				if (rc != 0) {
 					LOG_ERR("Snap retrieve failed on zvol"
 					    " %s, err(%d)", zinfo->name, rc);
@@ -1706,10 +1719,38 @@ read_socket:
 						    zinfo->name);
 						goto exit;
 					}
+					mutex_enter(&zv->rebuild_mtx);
+					if (zinfo->is_snap_inprogress) {
+						sleep(1);
+						LOG_INFO("waiting for snapshot"
+						    "to finish");
+						mutex_exit(&zv->rebuild_mtx);
+						goto retry;
+					}
+					zinfo->is_afs_inprogress = 1;
+					mutex_exit(&zv->rebuild_mtx);
 					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
 					    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
 					    fd, NULL, 0, 0, warg);
 					all_snap_done = B_TRUE;
+					rc = uzfs_zvol_read_header(fd, &hdr);
+					if (rc != 0) {
+						LOG_ERR("afs done read failed"
+						    " zvol %s err(%d)",
+						    zinfo->name, rc);
+						goto exit;
+					}
+					if (hdr.opcode !=
+					    ZVOL_OPCODE_AFS_DONE) {
+						LOG_ERR("afs done not"
+						    "received zvol %s",
+						    zinfo->name);
+						goto exit;
+					}
+
+					mutex_enter(&zv->rebuild_mtx);
+					zinfo->is_afs_inprogress = 0;
+					mutex_exit(&zv->rebuild_mtx);
 				}
 				if (ZINFO_IS_DEGRADED(zinfo))
 					zv = zinfo->clone_zv;
@@ -1838,7 +1879,6 @@ exit:
 		LOG_INFO("Closing rebuild connection for zvol %s from sock(%d)",
 		    zinfo->name, fd);
 		remove_pending_cmds_to_ack(fd, zinfo);
-
 		uzfs_zvol_remove_from_rebuild_scanner(zinfo, fd);
 		kmem_free(warg, sizeof (zvol_rebuild_scanner_info_t));
 
@@ -2376,6 +2416,7 @@ error_ret:
 		uzfs_zvol_set_status(zinfo->main_zv, status);
 		uzfs_update_ionum_interval(zinfo, 0);
 	}
+	zinfo->is_snap_inprogress = 0;
 	(void) mutex_exit(&zinfo->main_zv->rebuild_mtx);
 
 	thrd_arg = kmem_alloc(sizeof (thread_args_t), KM_SLEEP);

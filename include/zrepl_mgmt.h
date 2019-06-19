@@ -112,6 +112,8 @@ typedef struct zvol_info_s {
 		struct {
 			int	is_io_ack_sender_created	: 1;
 			int	is_io_receiver_created		: 1;
+			int	is_snap_inprogress		: 1;
+			int	is_afs_inprogress		: 1;
 		};
 		int flags;
 	};

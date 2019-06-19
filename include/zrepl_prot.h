@@ -71,6 +71,8 @@ enum zvol_op_code {
 	ZVOL_OPCODE_RESIZE,
 	ZVOL_OPCODE_STATS,
 	ZVOL_OPCODE_REBUILD_SNAP_START,
+	ZVOL_OPCODE_SNAP_PREPARE,
+	ZVOL_OPCODE_AFS_DONE,
 } __attribute__((packed));
 
 typedef enum zvol_op_code zvol_op_code_t;

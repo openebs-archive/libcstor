@@ -995,6 +995,13 @@ uzfs_zvol_execute_async_command(void *arg)
 	switch (async_task->hdr.opcode) {
 	case ZVOL_OPCODE_SNAP_CREATE:
 		snap = async_task->payload;
+		if (zinfo->is_snap_inprogress == 0) {
+			LOG_ERR("Failed to create snapshot %s"
+			    " because snap inprogress is not set", snap);
+			async_task->status = ZVOL_OP_STATUS_FAILED;
+			break;
+		}
+
 		rc = uzfs_zvol_create_snapshot_update_zap(zinfo, snap,
 		    async_task->hdr.io_seq);
 		if (rc != 0) {
@@ -1010,6 +1017,10 @@ uzfs_zvol_execute_async_command(void *arg)
 		} else {
 			async_task->status = ZVOL_OP_STATUS_OK;
 		}
+
+		mutex_enter(&zinfo->main_zv->rebuild_mtx);
+		zinfo->is_snap_inprogress = 0;
+		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		break;
 	case ZVOL_OPCODE_SNAP_DESTROY:
 		snap = async_task->payload;
@@ -1348,6 +1359,45 @@ end:
 	return (rc);
 }
 
+int
+handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
+    void *payload, size_t payload_size)
+{
+	zvol_info_t *zinfo;
+	char zvol_name[MAX_NAME_LEN];
+
+	strlcpy(zvol_name, payload, payload_size);
+	zvol_name[payload_size] = '\0';
+
+	char *snap = strchr(zvol_name, '@');
+
+	if (!payload_size || payload_size >= MAX_NAME_LEN || !snap) {
+		LOGERRCONN(conn, "snap prep invalid payload: %s", zvol_name);
+		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
+	}
+
+	*snap++ = '\0';
+
+	if ((zinfo = uzfs_zinfo_lookup(zvol_name)) == NULL) {
+		LOGERRCONN(conn, "snap prep Unknown zvol: %s", zvol_name);
+		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
+	}
+
+	mutex_enter(&zinfo->main_zv->rebuild_mtx);
+	if (zinfo->is_afs_inprogress) {
+		LOGERRCONN(conn, "snap prep afs inprogress : %s", zvol_name);
+		mutex_exit(&zinfo->main_zv->rebuild_mtx);
+		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
+	}
+	zinfo->is_snap_inprogress = 1;
+	mutex_exit(&zinfo->main_zv->rebuild_mtx);
+
+	LOGCONN(conn, "snap prepare command snap = %s progress = %d",
+	    snap, zinfo->is_snap_inprogress);
+
+	return (reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp));
+}
+
 /*
  * Process the whole message consisting of message header and optional payload.
  */
@@ -1463,16 +1513,21 @@ process_message(uzfs_mgmt_conn_t *conn)
 		}
 		if (uzfs_zvol_get_status(zinfo->main_zv) !=
 		    ZVOL_STATUS_HEALTHY) {
-			if (hdrp->opcode == ZVOL_OPCODE_SNAP_CREATE &&
-			    ZVOL_IS_REBUILDING_AFS(zinfo->main_zv)) {
-				LOG_INFO("zvol %s is not healthy and rebuild"
-				"is going on, can't take the %s snapshot,"
-				"erroring out the rebuild", zvol_name, snap);
-				mutex_enter(&zinfo->main_zv->rebuild_mtx);
-				uzfs_zvol_set_rebuild_status(zinfo->main_zv,
-				    ZVOL_REBUILDING_ERRORED);
-				mutex_exit(&zinfo->main_zv->rebuild_mtx);
+			mutex_enter(&zinfo->main_zv->rebuild_mtx);
+			if (hdrp->opcode == ZVOL_OPCODE_SNAP_CREATE) {
+				if (ZVOL_IS_REBUILDING_AFS(zinfo->main_zv)) {
+					LOG_INFO("zvol %s is not healthy and"
+					    "rebuild is going on, can't take"
+					    "the %s snapshot,"
+					    "erroring out the rebuild",
+					    zvol_name, snap);
+					uzfs_zvol_set_rebuild_status(
+					    zinfo->main_zv,
+					    ZVOL_REBUILDING_ERRORED);
+				}
+				zinfo->is_snap_inprogress = 0;
 			}
+			mutex_exit(&zinfo->main_zv->rebuild_mtx);
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOG_ERR("zvol %s is not healthy to take %s snapshot",
 			    zvol_name, snap);
@@ -1523,6 +1578,10 @@ process_message(uzfs_mgmt_conn_t *conn)
 		    payload_size);
 		break;
 
+	case ZVOL_OPCODE_SNAP_PREPARE:
+		rc = handle_prepare_snap_req(conn, hdrp, payload,
+		    payload_size);
+		break;
 	default:
 		LOGERRCONN(conn, "Message with unknown OP code %d",
 		    hdrp->opcode);
