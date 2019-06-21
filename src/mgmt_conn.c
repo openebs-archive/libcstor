@@ -1002,6 +1002,13 @@ uzfs_zvol_execute_async_command(void *arg)
 			break;
 		}
 
+		if (zinfo->disallow_snapshot) {
+			LOG_ERR("Failed to create snapshot %s"
+			    " because snapshot is not allowed", snap);
+			async_task->status = ZVOL_OP_STATUS_FAILED;
+			break;
+		}
+
 		rc = uzfs_zvol_create_snapshot_update_zap(zinfo, snap,
 		    async_task->hdr.io_seq);
 		if (rc != 0) {
@@ -1366,12 +1373,17 @@ handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	zvol_info_t *zinfo;
 	char zvol_name[MAX_NAME_LEN];
 
-	strlcpy(zvol_name, payload, payload_size);
+	if (!payload_size || payload_size >= MAX_NAME_LEN) {
+		LOGERRCONN(conn, "snap prep payload to large: %s", zvol_name);
+		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
+	}
+
+	memcpy(zvol_name, payload, payload_size);
 	zvol_name[payload_size] = '\0';
 
 	char *snap = strchr(zvol_name, '@');
 
-	if (!payload_size || payload_size >= MAX_NAME_LEN || !snap) {
+	if (!snap) {
 		LOGERRCONN(conn, "snap prep invalid payload: %s", zvol_name);
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	}
@@ -1384,19 +1396,19 @@ handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	}
 
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
-	if (zinfo->is_afs_inprogress) {
-		LOGERRCONN(conn, "snap prep afs inprogress : %s", zvol_name);
+	while (zinfo->disallow_snapshot || zinfo->is_snap_inprogress) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
-		uzfs_zinfo_drop_refcnt(zinfo);
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
+		LOG_INFO("waiting for snapshot to be allowed : %s snap %s",
+		    zvol_name, snap);
+		sleep(1);
+		mutex_enter(&zinfo->main_zv->rebuild_mtx);
 	}
 	zinfo->is_snap_inprogress = 1;
 	mutex_exit(&zinfo->main_zv->rebuild_mtx);
 
 	uzfs_zinfo_drop_refcnt(zinfo);
 
-	LOGCONN(conn, "snap prepare command snap = %s progress = %d",
-	    snap, zinfo->is_snap_inprogress);
+	LOGCONN(conn, "snap prepare command snap = %s", snap);
 
 	return (reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp));
 }

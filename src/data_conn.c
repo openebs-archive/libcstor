@@ -1723,14 +1723,15 @@ retry:
 						goto exit;
 					}
 					mutex_enter(&zv->rebuild_mtx);
-					if (zinfo->is_snap_inprogress) {
+					if (zinfo->is_snap_inprogress ||
+					    zinfo->disallow_snapshot) {
 						mutex_exit(&zv->rebuild_mtx);
 						sleep(1);
 						LOG_INFO("waiting for snapshot"
 						    " to finish");
 						goto retry;
 					}
-					zinfo->is_afs_inprogress = 1;
+					zinfo->disallow_snapshot = 1;
 					mutex_exit(&zv->rebuild_mtx);
 					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
 					    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
@@ -1758,9 +1759,8 @@ retry:
 						rc = -1;
 						goto exit;
 					}
-
 					mutex_enter(&zv->rebuild_mtx);
-					zinfo->is_afs_inprogress = 0;
+					zinfo->disallow_snapshot = 0;
 					mutex_exit(&zv->rebuild_mtx);
 				}
 				if (ZINFO_IS_DEGRADED(zinfo))
@@ -1895,6 +1895,9 @@ exit:
 		kmem_free(warg, sizeof (zvol_rebuild_scanner_info_t));
 
 		uzfs_zvol_remove_from_fd_list(zinfo, fd);
+		mutex_enter(&zinfo->main_zv->rebuild_mtx);
+		zinfo->disallow_snapshot = 0;
+		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 
 		uzfs_zinfo_drop_refcnt(zinfo);
 	} else {
