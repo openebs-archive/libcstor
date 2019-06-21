@@ -1374,7 +1374,7 @@ handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	char zvol_name[MAX_NAME_LEN];
 
 	if (!payload_size || payload_size >= MAX_NAME_LEN) {
-		LOGERRCONN(conn, "snap prep payload to large: %s", zvol_name);
+		LOGERRCONN(conn, "snap prep payload to large");
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	}
 
@@ -1398,7 +1398,8 @@ handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 	while (zinfo->disallow_snapshot || zinfo->is_snap_inprogress) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
-		LOG_INFO("waiting for snapshot to be allowed : %s snap %s",
+		LOG_INFO("waiting ... snapshot %s : %s snap %s",
+		    zinfo->disallow_snapshot ? "disallowed" : "snap inprogress",
 		    zvol_name, snap);
 		sleep(1);
 		mutex_enter(&zinfo->main_zv->rebuild_mtx);
