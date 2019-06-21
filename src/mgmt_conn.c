@@ -1387,10 +1387,13 @@ handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	if (zinfo->is_afs_inprogress) {
 		LOGERRCONN(conn, "snap prep afs inprogress : %s", zvol_name);
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
+		uzfs_zinfo_drop_refcnt(zinfo);
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	}
 	zinfo->is_snap_inprogress = 1;
 	mutex_exit(&zinfo->main_zv->rebuild_mtx);
+
+	uzfs_zinfo_drop_refcnt(zinfo);
 
 	LOGCONN(conn, "snap prepare command snap = %s progress = %d",
 	    snap, zinfo->is_snap_inprogress);
@@ -1513,8 +1516,8 @@ process_message(uzfs_mgmt_conn_t *conn)
 		}
 		if (uzfs_zvol_get_status(zinfo->main_zv) !=
 		    ZVOL_STATUS_HEALTHY) {
-			mutex_enter(&zinfo->main_zv->rebuild_mtx);
 			if (hdrp->opcode == ZVOL_OPCODE_SNAP_CREATE) {
+				mutex_enter(&zinfo->main_zv->rebuild_mtx);
 				if (ZVOL_IS_REBUILDING_AFS(zinfo->main_zv)) {
 					LOG_INFO("zvol %s is not healthy and"
 					    "rebuild is going on, can't take"
@@ -1526,8 +1529,8 @@ process_message(uzfs_mgmt_conn_t *conn)
 					    ZVOL_REBUILDING_ERRORED);
 				}
 				zinfo->is_snap_inprogress = 0;
+				mutex_exit(&zinfo->main_zv->rebuild_mtx);
 			}
-			mutex_exit(&zinfo->main_zv->rebuild_mtx);
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOG_ERR("zvol %s is not healthy to take %s snapshot",
 			    zvol_name, snap);

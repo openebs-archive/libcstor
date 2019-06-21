@@ -921,12 +921,15 @@ next_step:
 				zinfo->quiesce_requested = 1;
 			}
 			mutex_exit(&zinfo->main_zv->rebuild_mtx);
-
-			hdr.opcode = ZVOL_OPCODE_AFS_DONE;
+			/*
+			 * AFS trans done, let the scanner know that
+			 * transition is done.
+			 */
+			hdr.opcode = ZVOL_OPCODE_AFS_STARTED;
 			rc = uzfs_zvol_socket_write(sfd, (char *)&hdr,
 			    sizeof (hdr));
 			if (rc != 0) {
-				LOG_ERR("Socket rebuild afs done write failed"
+				LOG_ERR("afs started write failed"
 				    "for %s on fd(%d) err(%d)",
 				    zvol_state->zv_name, sfd, rc);
 				goto exit;
@@ -1680,8 +1683,8 @@ read_socket:
 			    == 1)
 				sleep(5);
 #endif
-retry:
 			io_seq = hdr.checkpointed_io_seq;
+retry:
 
 			if (snap_zv == NULL) {
 				rc = uzfs_get_snap_zv_ionum(zinfo,
@@ -1721,10 +1724,10 @@ retry:
 					}
 					mutex_enter(&zv->rebuild_mtx);
 					if (zinfo->is_snap_inprogress) {
+						mutex_exit(&zv->rebuild_mtx);
 						sleep(1);
 						LOG_INFO("waiting for snapshot"
-						    "to finish");
-						mutex_exit(&zv->rebuild_mtx);
+						    " to finish");
 						goto retry;
 					}
 					zinfo->is_afs_inprogress = 1;
@@ -1733,18 +1736,26 @@ retry:
 					    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
 					    fd, NULL, 0, 0, warg);
 					all_snap_done = B_TRUE;
+					/*
+					 * wait for the downgraded replica to
+					 * transition into the AFS mode. After
+					 * that we can reset the afs_inprogress
+					 * as downgraded replica can now handle
+					 * the snapshot command gracefully.
+					 */
 					rc = uzfs_zvol_read_header(fd, &hdr);
 					if (rc != 0) {
-						LOG_ERR("afs done read failed"
-						    " zvol %s err(%d)",
+						LOG_ERR("afs started read"
+						    " failed zvol %s err(%d)",
 						    zinfo->name, rc);
 						goto exit;
 					}
 					if (hdr.opcode !=
-					    ZVOL_OPCODE_AFS_DONE) {
-						LOG_ERR("afs done not"
+					    ZVOL_OPCODE_AFS_STARTED) {
+						LOG_ERR("afs started not"
 						    "received zvol %s",
 						    zinfo->name);
+						rc = -1;
 						goto exit;
 					}
 
@@ -1879,6 +1890,7 @@ exit:
 		LOG_INFO("Closing rebuild connection for zvol %s from sock(%d)",
 		    zinfo->name, fd);
 		remove_pending_cmds_to_ack(fd, zinfo);
+
 		uzfs_zvol_remove_from_rebuild_scanner(zinfo, fd);
 		kmem_free(warg, sizeof (zvol_rebuild_scanner_info_t));
 
