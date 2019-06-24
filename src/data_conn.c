@@ -1748,15 +1748,17 @@ retry:
 					rc = uzfs_zvol_read_header(fd, &hdr);
 					do {
 						if (rc != 0) {
-							LOG_ERR("afs started read"
-							    " failed zvol %s err(%d)",
+							LOG_ERR("afs started "
+							    "read failed "
+							    "zvol %s err(%d)",
 							    zinfo->name, rc);
 							break;
 						}
 						if (hdr.opcode !=
 						    ZVOL_OPCODE_AFS_STARTED) {
-							LOG_ERR("afs started not"
-							    "received zvol %s",
+							LOG_ERR("afs started "
+							    "not received "
+							    "zvol = %s",
 							    zinfo->name);
 							rc = -1;
 							break;
