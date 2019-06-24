@@ -1740,9 +1740,10 @@ retry:
 					/*
 					 * wait for the downgraded replica to
 					 * transition into the AFS mode. After
-					 * that we can reset the afs_inprogress
-					 * as downgraded replica can now handle
-					 * the snapshot command gracefully.
+					 * that we can reset the disallow
+					 * snapshot flag as downgraded replica
+					 * can now handle the snapshot command
+					 * gracefully.
 					 */
 					rc = uzfs_zvol_read_header(fd, &hdr);
 					if (rc != 0) {
