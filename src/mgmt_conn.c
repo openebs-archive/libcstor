@@ -1025,9 +1025,13 @@ uzfs_zvol_execute_async_command(void *arg)
 			async_task->status = ZVOL_OP_STATUS_OK;
 		}
 
-		mutex_enter(&zinfo->main_zv->rebuild_mtx);
-		zinfo->is_snap_inprogress = 0;
-		mutex_exit(&zinfo->main_zv->rebuild_mtx);
+		mutex_enter(&async_tasks_mtx);
+		if (async_task->conn_closed == B_FALSE) {
+			mutex_enter(&zinfo->main_zv->rebuild_mtx);
+			zinfo->is_snap_inprogress = 0;
+			mutex_exit(&zinfo->main_zv->rebuild_mtx);
+		}
+		mutex_exit(&async_tasks_mtx);
 		break;
 	case ZVOL_OPCODE_SNAP_DESTROY:
 		snap = async_task->payload;
