@@ -922,6 +922,19 @@ next_step:
 			}
 			mutex_exit(&zinfo->main_zv->rebuild_mtx);
 			/*
+			 * AFS trans done, let the scanner know that
+			 * transition is done.
+			 */
+			hdr.opcode = ZVOL_OPCODE_AFS_STARTED;
+			rc = uzfs_zvol_socket_write(sfd, (char *)&hdr,
+			    sizeof (hdr));
+			if (rc != 0) {
+				LOG_ERR("afs started write failed"
+				    "for %s on fd(%d) err(%d)",
+				    zvol_state->zv_name, sfd, rc);
+				goto exit;
+			}
+			/*
 			 * Wait for all outstanding IOs to be flushed
 			 * to disk before making further progress
 			 */
@@ -1574,7 +1587,7 @@ uzfs_zvol_rebuild_scanner(void *arg)
 	boolean_t	all_snap_done = B_FALSE;
 	char		*payload = NULL;
 	uint64_t	checkpointed_io_seq = 0;
-	uint64_t	payload_size = 0;
+	uint64_t	payload_size = 0, io_seq;
 	char		*snap_name;
 	zvol_rebuild_scanner_info_t	*warg = NULL;
 	char		*at_ptr = NULL;
@@ -1670,9 +1683,23 @@ read_socket:
 			    == 1)
 				sleep(5);
 #endif
+			io_seq = hdr.checkpointed_io_seq;
+retry:
+			if ((zinfo->state == ZVOL_INFO_STATE_OFFLINE) ||
+			    (!zinfo->is_io_ack_sender_created)) {
+				LOG_ERR("scanner [%s:%d] in err state",
+				    zinfo->name, warg->fd);
+				goto exit;
+			}
+			if (warg->is_fd_errored) {
+				LOG_ERR("scanner [%s:%d] errored at ack_sender",
+				    zinfo->name, warg->fd);
+				goto exit;
+			}
+
 			if (snap_zv == NULL) {
 				rc = uzfs_get_snap_zv_ionum(zinfo,
-				    hdr.checkpointed_io_seq, &snap_zv);
+				    io_seq, &snap_zv);
 				if (rc != 0) {
 					LOG_ERR("Snap retrieve failed on zvol"
 					    " %s, err(%d)", zinfo->name, rc);
@@ -1706,10 +1733,53 @@ read_socket:
 						    zinfo->name);
 						goto exit;
 					}
+					mutex_enter(&zv->rebuild_mtx);
+					if (zinfo->is_snap_inprogress ||
+					    zinfo->disallow_snapshot) {
+						mutex_exit(&zv->rebuild_mtx);
+						sleep(1);
+						LOG_INFO("waiting for snapshot"
+						    " to finish");
+						goto retry;
+					}
+					zinfo->disallow_snapshot = 1;
+					mutex_exit(&zv->rebuild_mtx);
 					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
 					    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
 					    fd, NULL, 0, 0, warg);
 					all_snap_done = B_TRUE;
+					/*
+					 * wait for the downgraded replica to
+					 * transition into the AFS mode. After
+					 * that we can reset the disallow
+					 * snapshot flag as downgraded replica
+					 * can now handle the snapshot command
+					 * gracefully.
+					 */
+					rc = uzfs_zvol_read_header(fd, &hdr);
+					do {
+						if (rc != 0) {
+							LOG_ERR("afs started "
+							    "read failed "
+							    "zvol %s err(%d)",
+							    zinfo->name, rc);
+							break;
+						}
+						if (hdr.opcode !=
+						    ZVOL_OPCODE_AFS_STARTED) {
+							LOG_ERR("afs started "
+							    "not received "
+							    "zvol = %s",
+							    zinfo->name);
+							rc = -1;
+							break;
+						}
+					} while (0);
+					mutex_enter(&zv->rebuild_mtx);
+					zinfo->disallow_snapshot = 0;
+					mutex_exit(&zv->rebuild_mtx);
+					if (rc != 0)
+						goto exit;
 				}
 				if (ZINFO_IS_DEGRADED(zinfo))
 					zv = zinfo->clone_zv;
@@ -2376,6 +2446,7 @@ error_ret:
 		uzfs_zvol_set_status(zinfo->main_zv, status);
 		uzfs_update_ionum_interval(zinfo, 0);
 	}
+	zinfo->is_snap_inprogress = 0;
 	(void) mutex_exit(&zinfo->main_zv->rebuild_mtx);
 
 	thrd_arg = kmem_alloc(sizeof (thread_args_t), KM_SLEEP);
