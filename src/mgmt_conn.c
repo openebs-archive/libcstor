@@ -995,12 +995,6 @@ uzfs_zvol_execute_async_command(void *arg)
 	switch (async_task->hdr.opcode) {
 	case ZVOL_OPCODE_SNAP_CREATE:
 		snap = async_task->payload;
-		if (zinfo->is_snap_inprogress == 0) {
-			LOG_ERR("Failed to create snapshot %s"
-			    " because snap inprogress is not set", snap);
-			async_task->status = ZVOL_OP_STATUS_FAILED;
-			break;
-		}
 
 		if (zinfo->disallow_snapshot) {
 			LOG_ERR("Failed to create snapshot %s"
