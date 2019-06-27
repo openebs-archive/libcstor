@@ -1380,7 +1380,6 @@ handle_prepare_snap_req(zvol_info_t *zinfo, uzfs_mgmt_conn_t *conn,
 		LOG_INFO("prep snapshot failed %s : %s snap %s",
 		    zinfo->disallow_snapshot ? "disallowed" : "snap inprogress",
 		    zvol_name, snap);
-		uzfs_zinfo_drop_refcnt(zinfo);
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	}
 	zinfo->is_snap_inprogress = 1;
