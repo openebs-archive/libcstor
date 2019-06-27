@@ -995,12 +995,6 @@ uzfs_zvol_execute_async_command(void *arg)
 	switch (async_task->hdr.opcode) {
 	case ZVOL_OPCODE_SNAP_CREATE:
 		snap = async_task->payload;
-		if (zinfo->is_snap_inprogress == 0) {
-			LOG_ERR("Failed to create snapshot %s"
-			    " because snap inprogress is not set", snap);
-			async_task->status = ZVOL_OP_STATUS_FAILED;
-			break;
-		}
 
 		if (zinfo->disallow_snapshot) {
 			LOG_ERR("Failed to create snapshot %s"
@@ -1026,7 +1020,11 @@ uzfs_zvol_execute_async_command(void *arg)
 		}
 
 		mutex_enter(&zinfo->main_zv->rebuild_mtx);
-		zinfo->is_snap_inprogress = 0;
+		mutex_enter(&async_tasks_mtx);
+		if (async_task->conn_closed == B_FALSE) {
+			zinfo->is_snap_inprogress = 0;
+		}
+		mutex_exit(&async_tasks_mtx);
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		break;
 	case ZVOL_OPCODE_SNAP_DESTROY:
@@ -1367,47 +1365,19 @@ end:
 }
 
 int
-handle_prepare_snap_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
-    void *payload, size_t payload_size)
+handle_prepare_snap_req(zvol_info_t *zinfo, uzfs_mgmt_conn_t *conn,
+    zvol_io_hdr_t *hdrp, char *zvol_name, char *snap)
 {
-	zvol_info_t *zinfo;
-	char zvol_name[MAX_NAME_LEN];
-
-	if (!payload_size || payload_size >= MAX_NAME_LEN) {
-		LOGERRCONN(conn, "snap prep payload to large");
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
-	}
-
-	memcpy(zvol_name, payload, payload_size);
-	zvol_name[payload_size] = '\0';
-
-	char *snap = strchr(zvol_name, '@');
-
-	if (!snap) {
-		LOGERRCONN(conn, "snap prep invalid payload: %s", zvol_name);
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
-	}
-
-	*snap++ = '\0';
-
-	if ((zinfo = uzfs_zinfo_lookup(zvol_name)) == NULL) {
-		LOGERRCONN(conn, "snap prep Unknown zvol: %s", zvol_name);
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
-	}
-
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 	if (zinfo->disallow_snapshot || zinfo->is_snap_inprogress) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		LOG_INFO("prep snapshot failed %s : %s snap %s",
 		    zinfo->disallow_snapshot ? "disallowed" : "snap inprogress",
 		    zvol_name, snap);
-		uzfs_zinfo_drop_refcnt(zinfo);
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	}
 	zinfo->is_snap_inprogress = 1;
 	mutex_exit(&zinfo->main_zv->rebuild_mtx);
-
-	uzfs_zinfo_drop_refcnt(zinfo);
 
 	LOGCONN(conn, "snap prepare command snap = %s", snap);
 
@@ -1491,6 +1461,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 	case ZVOL_OPCODE_SNAP_CREATE:
 	case ZVOL_OPCODE_SNAP_DESTROY:
 	case ZVOL_OPCODE_SNAP_LIST:
+	case ZVOL_OPCODE_SNAP_PREPARE:
 		if (payload_size == 0 || payload_size >= MAX_NAME_LEN) {
 			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
@@ -1525,6 +1496,12 @@ process_message(uzfs_mgmt_conn_t *conn)
 			LOGCONN(conn, "Snaplist command for %s", zinfo->name);
 			rc = uzfs_zvol_dispatch_command(conn, hdrp, NULL, 0,
 			    zinfo);
+			break;
+		}
+		if (hdrp->opcode == ZVOL_OPCODE_SNAP_PREPARE) {
+			rc = handle_prepare_snap_req(zinfo, conn, hdrp,
+			    zvol_name, snap);
+			uzfs_zinfo_drop_refcnt(zinfo);
 			break;
 		}
 		if (uzfs_zvol_get_status(zinfo->main_zv) !=
@@ -1594,10 +1571,6 @@ process_message(uzfs_mgmt_conn_t *conn)
 		    payload_size);
 		break;
 
-	case ZVOL_OPCODE_SNAP_PREPARE:
-		rc = handle_prepare_snap_req(conn, hdrp, payload,
-		    payload_size);
-		break;
 	default:
 		LOGERRCONN(conn, "Message with unknown OP code %d",
 		    hdrp->opcode);
