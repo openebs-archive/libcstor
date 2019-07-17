@@ -1572,7 +1572,7 @@ again:
 }
 
 int
-hanlde_afs_transition(zvol_info_t *zinfo, zvol_rebuild_scanner_info_t *warg)
+handle_afs_transition(zvol_info_t *zinfo, zvol_rebuild_scanner_info_t *warg)
 {
 	int rc = 0;
 	int fd = warg->fd;
@@ -1592,7 +1592,7 @@ hanlde_afs_transition(zvol_info_t *zinfo, zvol_rebuild_scanner_info_t *warg)
 	    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
 	    fd, NULL, 0, 0, warg);
 
-	if (warg->version >= REPLICA_REBUILD_VERSION) {
+	if (warg->version >= RESIZE_REBUILD_MIN_VERSION) {
 		/*
 		 * wait for the downgraded replica to
 		 * transition into the AFS mode. After
@@ -1756,15 +1756,15 @@ retry:
 					    " %s, err(%d)", zinfo->name, rc);
 					goto exit;
 				}
-				if (snap_zv != NULL &&
-				    warg->version >= REPLICA_REBUILD_VERSION) {
-					uint64_t volsize =
-					    ZVOL_VOLUME_SIZE(snap_zv);
-					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
-					    ZVOL_OPCODE_REBUILD_SNAP_START,
-					    fd, (char *)&volsize,
-					    sizeof (volsize), 0, warg);
-
+				if (snap_zv != NULL) {
+					if (warg->version >= RESIZE_REBUILD_MIN_VERSION) {
+						uint64_t volsize =
+						    ZVOL_VOLUME_SIZE(snap_zv);
+						uzfs_zvol_send_zio_cmd(zinfo, &hdr,
+						    ZVOL_OPCODE_REBUILD_SNAP_START,
+						    fd, (char *)&volsize,
+						    sizeof (volsize), 0, warg);
+					}
 					LOG_INFO("Rebuilding from zv:%s\n",
 					    snap_zv->zv_name);
 				}
@@ -1786,7 +1786,7 @@ retry:
 						goto exit;
 					}
 
-					rc = hanlde_afs_transition(zinfo, warg);
+					rc = handle_afs_transition(zinfo, warg);
 					if (rc > 0) {
 						sleep(1);
 						LOG_INFO("waiting for snapshot"
@@ -1806,7 +1806,7 @@ retry:
 					    " err(%d)", zinfo->name, rc);
 					goto exit;
 				}
-				if (warg->version >= REPLICA_REBUILD_VERSION) {
+				if (warg->version >= RESIZE_REBUILD_MIN_VERSION) {
 					uint64_t volsize = ZVOL_VOLUME_SIZE(snap_zv);
 					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
 					    ZVOL_OPCODE_REBUILD_SNAP_START,
