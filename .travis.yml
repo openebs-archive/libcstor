@@ -61,7 +61,6 @@ install:
     - sudo ldconfig
     - cd ..
     - cd cstor
-    - git checkout develop
     - sh autogen.sh
     - ./configure --with-config=user --enable-code-coverage=yes --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
     - make -j4;
