@@ -955,8 +955,13 @@ next_step:
 			}
 			continue;
 		}
-		ASSERT((hdr.opcode == ZVOL_OPCODE_READ) &&
-		    (hdr.flags & ZVOL_OP_FLAG_REBUILD));
+		if ((hdr.opcode != ZVOL_OPCODE_READ) ||
+		    !(hdr.flags & ZVOL_OP_FLAG_REBUILD)) {
+			rc = -1;
+			LOG_ERR("invalid op for vol %s code=%d flag=0x%x on "
+			    "fd(%d)", zinfo->name, hdr.opcode, hdr.flags, sfd);
+			goto exit;
+		}
 		hdr.opcode = ZVOL_OPCODE_WRITE;
 
 		zio_cmd = zio_cmd_alloc(&hdr, sfd);
@@ -1566,6 +1571,52 @@ again:
 	return (ret);
 }
 
+int
+hanlde_afs_transition(zvol_info_t *zinfo, zvol_rebuild_scanner_info_t *warg)
+{
+	int rc = 0;
+	int fd = warg->fd;
+	zvol_state_t *zv = zinfo->main_zv;
+	zvol_io_hdr_t	hdr;
+
+	mutex_enter(&zv->rebuild_mtx);
+	if (zinfo->is_snap_inprogress ||
+	    zinfo->disallow_snapshot) {
+		mutex_exit(&zv->rebuild_mtx);
+		return (1);
+	}
+	zinfo->disallow_snapshot = 1;
+	mutex_exit(&zv->rebuild_mtx);
+
+	uzfs_zvol_send_zio_cmd(zinfo, &hdr,
+	    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
+	    fd, NULL, 0, 0, warg);
+
+	if (warg->version >= REPLICA_REBUILD_VERSION) {
+		/*
+		 * wait for the downgraded replica to
+		 * transition into the AFS mode. After
+		 * that we can reset the disallow
+		 * snapshot flag as downgraded replica
+		 * can now handle the snapshot command
+		 * gracefully.
+		 */
+		rc = uzfs_zvol_read_header(fd, &hdr);
+		if (rc != 0) {
+			LOG_ERR("afs started read failed zvol %s err(%d)",
+			    zinfo->name, rc);
+			rc = -1;
+		} else if (hdr.opcode != ZVOL_OPCODE_AFS_STARTED) {
+			LOG_ERR("afs started not received zvol = %s", zinfo->name);
+			rc = -1;
+		}
+	}
+	mutex_enter(&zv->rebuild_mtx);
+	zinfo->disallow_snapshot = 0;
+	mutex_exit(&zv->rebuild_mtx);
+	return (rc);
+}
+
 /*
  * Rebuild scanner function which after receiving
  * vol_name and IO number, will scan metadata and
@@ -1705,7 +1756,8 @@ retry:
 					    " %s, err(%d)", zinfo->name, rc);
 					goto exit;
 				}
-				if (snap_zv != NULL) {
+				if (snap_zv != NULL &&
+				    warg->version >= REPLICA_REBUILD_VERSION) {
 					uint64_t volsize =
 					    ZVOL_VOLUME_SIZE(snap_zv);
 					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
@@ -1733,53 +1785,17 @@ retry:
 						    zinfo->name);
 						goto exit;
 					}
-					mutex_enter(&zv->rebuild_mtx);
-					if (zinfo->is_snap_inprogress ||
-					    zinfo->disallow_snapshot) {
-						mutex_exit(&zv->rebuild_mtx);
+
+					rc = hanlde_afs_transition(zinfo, warg);
+					if (rc > 0) {
 						sleep(1);
 						LOG_INFO("waiting for snapshot"
 						    " to finish");
 						goto retry;
-					}
-					zinfo->disallow_snapshot = 1;
-					mutex_exit(&zv->rebuild_mtx);
-					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
-					    ZVOL_OPCODE_REBUILD_ALL_SNAP_DONE,
-					    fd, NULL, 0, 0, warg);
-					all_snap_done = B_TRUE;
-					/*
-					 * wait for the downgraded replica to
-					 * transition into the AFS mode. After
-					 * that we can reset the disallow
-					 * snapshot flag as downgraded replica
-					 * can now handle the snapshot command
-					 * gracefully.
-					 */
-					rc = uzfs_zvol_read_header(fd, &hdr);
-					do {
-						if (rc != 0) {
-							LOG_ERR("afs started "
-							    "read failed "
-							    "zvol %s err(%d)",
-							    zinfo->name, rc);
-							break;
-						}
-						if (hdr.opcode !=
-						    ZVOL_OPCODE_AFS_STARTED) {
-							LOG_ERR("afs started "
-							    "not received "
-							    "zvol = %s",
-							    zinfo->name);
-							rc = -1;
-							break;
-						}
-					} while (0);
-					mutex_enter(&zv->rebuild_mtx);
-					zinfo->disallow_snapshot = 0;
-					mutex_exit(&zv->rebuild_mtx);
-					if (rc != 0)
+					} else if (rc < 0) {
 						goto exit;
+					}
+					all_snap_done = B_TRUE;
 				}
 				if (ZINFO_IS_DEGRADED(zinfo))
 					zv = zinfo->clone_zv;
@@ -1790,11 +1806,13 @@ retry:
 					    " err(%d)", zinfo->name, rc);
 					goto exit;
 				}
-				uint64_t volsize = ZVOL_VOLUME_SIZE(snap_zv);
-				uzfs_zvol_send_zio_cmd(zinfo, &hdr,
-				    ZVOL_OPCODE_REBUILD_SNAP_START,
-				    fd, (char *)&volsize,
-				    sizeof (volsize), 0, warg);
+				if (warg->version >= REPLICA_REBUILD_VERSION) {
+					uint64_t volsize = ZVOL_VOLUME_SIZE(snap_zv);
+					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
+					    ZVOL_OPCODE_REBUILD_SNAP_START,
+					    fd, (char *)&volsize,
+					    sizeof (volsize), 0, warg);
+				}
 			}
 
 			rc = uzfs_get_io_diff(zv, &metadata,
@@ -2235,10 +2253,8 @@ get_open_opcode_data_len(zvol_io_hdr_t *hdr)
 	switch (hdr->version) {
 		case 3:
 			return (sizeof (zvol_op_open_data_ver_3_t));
-		case 4:
-			return (sizeof (zvol_op_open_data_t));
 		default:
-			return (-1);
+			return (sizeof (zvol_op_open_data_t));
 	}
 }
 
