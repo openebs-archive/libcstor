@@ -48,6 +48,10 @@ install:
     - cd ..
     # we need cstor code
     - git clone https://github.com/openebs/cstor.git
+    - cd cstor
+    - if [ ${TRAVIS_BRANCH} == "master" ]; then git checkout develop; else git checkout ${TRAVIS_BRANCH} || git checkout develop; fi
+    - git branch
+    - cd ..
     # return to libcstor code
     - cd libcstor
     - sh autogen.sh
@@ -57,7 +61,6 @@ install:
     - sudo ldconfig
     - cd ..
     - cd cstor
-    - git checkout develop
     - sh autogen.sh
     - ./configure --with-config=user --enable-code-coverage=yes --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
     - make -j4;
