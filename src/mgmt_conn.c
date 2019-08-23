@@ -1042,16 +1042,25 @@ uzfs_zvol_execute_async_command(void *arg)
 		break;
 	case ZVOL_OPCODE_RESIZE:
 		volsize = *(uint64_t *)async_task->payload;
-		rc = zvol_check_volsize(volsize,
-		    zinfo->main_zv->zv_volblocksize);
-		if (rc == 0) {
-			rc = zvol_update_volsize(volsize,
-			    zinfo->main_zv->zv_objset);
-			if (rc == 0)
-				zvol_size_changed(zinfo->main_zv, volsize);
+		if (uzfs_zvol_get_status(zinfo->main_zv) ==
+		    ZVOL_STATUS_HEALTHY) {
+			// TODO: Is assertion with snapshot and clone
+			// data set is required here?
+			rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
+		} else {
+			rc = uzfs_zvol_resize(zinfo->clone_zv, volsize);
+			if (rc != 0) {
+				LOG_ERR("Failed to resize cloned volume %s",
+				    zinfo->clone_zv->zv_name);
+				goto ret_error;
+			}
+			if (uzfs_zvol_get_rebuild_status(zinfo->main_zv) ==
+			    ZVOL_REBUILDING_AFS)
+				rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
 		}
+ret_error:
 		if (rc != 0) {
-			LOG_ERR("Failed to resize zvol %s", zinfo->name);
+			LOG_ERR("Failed to resize main volume %s", zinfo->name);
 			async_task->status = ZVOL_OP_STATUS_FAILED;
 		} else {
 			async_task->status = ZVOL_OP_STATUS_OK;
