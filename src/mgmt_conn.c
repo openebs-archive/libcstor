@@ -1042,25 +1042,40 @@ uzfs_zvol_execute_async_command(void *arg)
 		break;
 	case ZVOL_OPCODE_RESIZE:
 		volsize = *(uint64_t *)async_task->payload;
+		// Take rebuild_mtx lock since we are checking the status
+		mutex_enter(&zinfo->main_zv->rebuild_mtx);
 		if (uzfs_zvol_get_status(zinfo->main_zv) ==
 		    ZVOL_STATUS_HEALTHY) {
-			// TODO: Is assertion with snapshot and clone
-			// data set is required here?
 			rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
+			if (rc != 0) {
+				mutex_exit(&zinfo->main_zv->rebuild_mtx);
+				LOG_ERR("Failed to resize main volume %s",
+				    zinfo->main_zv->zv_name);
+				goto ret_error;
+			}
 		} else {
 			rc = uzfs_zvol_resize(zinfo->clone_zv, volsize);
 			if (rc != 0) {
-				LOG_ERR("Failed to resize cloned volume %s",
+				mutex_exit(&zinfo->main_zv->rebuild_mtx);
+				LOG_ERR("Failed to resize clone volume %s",
 				    zinfo->clone_zv->zv_name);
 				goto ret_error;
 			}
 			if (uzfs_zvol_get_rebuild_status(zinfo->main_zv) ==
 			    ZVOL_REBUILDING_AFS)
 				rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
+				if (rc != 0) {
+					mutex_exit(
+					    &zinfo->main_zv->rebuild_mtx);
+					LOG_ERR("Failed to resize main"
+					    " volume %s in AFS mode",
+					    zinfo->main_zv->zv_name);
+					goto ret_error;
+				}
 		}
+		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 ret_error:
 		if (rc != 0) {
-			LOG_ERR("Failed to resize main volume %s", zinfo->name);
 			async_task->status = ZVOL_OP_STATUS_FAILED;
 		} else {
 			async_task->status = ZVOL_OP_STATUS_OK;
