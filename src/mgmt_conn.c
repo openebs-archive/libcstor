@@ -1062,7 +1062,7 @@ uzfs_zvol_execute_async_command(void *arg)
 				goto ret_error;
 			}
 			if (uzfs_zvol_get_rebuild_status(zinfo->main_zv) ==
-			    ZVOL_REBUILDING_AFS)
+			    ZVOL_REBUILDING_AFS) {
 				rc = uzfs_zvol_resize(zinfo->main_zv, volsize);
 				if (rc != 0) {
 					mutex_exit(
@@ -1072,8 +1072,11 @@ uzfs_zvol_execute_async_command(void *arg)
 					    zinfo->main_zv->zv_name);
 					goto ret_error;
 				}
+			}
 		}
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
+		LOG_INFO("Successfully resized the zvol "
+		    "to %lu bytes", volsize);
 ret_error:
 		if (rc != 0) {
 			async_task->status = ZVOL_OP_STATUS_FAILED;
