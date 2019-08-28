@@ -1043,6 +1043,8 @@ uzfs_zvol_execute_async_command(void *arg)
 	case ZVOL_OPCODE_RESIZE:
 		volsize = *(uint64_t *)async_task->payload;
 		// Take rebuild_mtx lock since we are checking the status
+		LOG_INFO("Resizing zvol %s to %lu bytes",
+		    zinfo->name, volsize);
 		mutex_enter(&zinfo->main_zv->rebuild_mtx);
 		if (uzfs_zvol_get_status(zinfo->main_zv) ==
 		    ZVOL_STATUS_HEALTHY) {
@@ -1075,8 +1077,8 @@ uzfs_zvol_execute_async_command(void *arg)
 			}
 		}
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
-		LOG_INFO("Successfully resized the zvol "
-		    "to %lu bytes", volsize);
+		LOG_INFO("Successfully resized zvol %s "
+		    "to %lu bytes", zinfo->name, volsize);
 ret_error:
 		if (rc != 0) {
 			async_task->status = ZVOL_OP_STATUS_FAILED;
