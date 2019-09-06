@@ -1042,6 +1042,15 @@ uzfs_zvol_execute_async_command(void *arg)
 		break;
 	case ZVOL_OPCODE_RESIZE:
 		volsize = *(uint64_t *)async_task->payload;
+		if (volsize < ZVOL_VOLUME_SIZE(zinfo->main_zv)) {
+			LOG_ERR("Failed to resize main volume %s, "
+			    "resizing from %lu to %lu is not allowed",
+			    zinfo->main_zv->zv_name,
+			    ZVOL_VOLUME_SIZE(zinfo->main_zv),
+			    volsize);
+			rc = -1;
+			goto ret_error;
+		}
 		// Take rebuild_mtx lock since we are checking the status
 		LOG_INFO("Resizing zvol %s to %lu bytes",
 		    zinfo->name, volsize);
