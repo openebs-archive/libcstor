@@ -1042,15 +1042,6 @@ uzfs_zvol_execute_async_command(void *arg)
 		break;
 	case ZVOL_OPCODE_RESIZE:
 		volsize = *(uint64_t *)async_task->payload;
-		if (volsize < ZVOL_VOLUME_SIZE(zinfo->main_zv)) {
-			LOG_ERR("Failed to resize main volume %s, "
-			    "resizing from %lu to %lu is not allowed",
-			    zinfo->main_zv->zv_name,
-			    ZVOL_VOLUME_SIZE(zinfo->main_zv),
-			    volsize);
-			rc = -1;
-			goto ret_error;
-		}
 		// Take rebuild_mtx lock since we are checking the status
 		LOG_INFO("Resizing zvol %s to %lu bytes",
 		    zinfo->name, volsize);
@@ -1594,6 +1585,16 @@ process_message(uzfs_mgmt_conn_t *conn)
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOGERRCONN(conn, "Target used invalid connection for "
 			    "zvol %s", resize_data->volname);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
+			break;
+		}
+		if (resize_data->size < ZVOL_VOLUME_SIZE(zinfo->main_zv)) {
+			LOGERRCONN(conn, "Failed to resize main volume %s, "
+			    "resizing from %lu to %lu is not allowed",
+			    zinfo->main_zv->zv_name,
+			    ZVOL_VOLUME_SIZE(zinfo->main_zv),
+			    resize_data->size);
+			uzfs_zinfo_drop_refcnt(zinfo);
 			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
