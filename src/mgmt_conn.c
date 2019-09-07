@@ -1591,10 +1591,10 @@ process_message(uzfs_mgmt_conn_t *conn)
 		}
 		vol_size = ZVOL_VOLUME_SIZE(zinfo->main_zv);
 		if (resize_data->size < vol_size) {
-			uzfs_zinfo_drop_refcnt(zinfo);
 			LOGERRCONN(conn, "Failed to resize main volume %s, "
 			    "resizing from %lu to %lu is not allowed",
 			    zinfo->name, vol_size, resize_data->size);
+			uzfs_zinfo_drop_refcnt(zinfo);
 			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
