@@ -1426,6 +1426,7 @@ process_message(uzfs_mgmt_conn_t *conn)
 	zvol_op_resize_data_t *resize_data;
 	zvol_info_t *zinfo;
 	char *snap = NULL;
+	uint64_t vol_size;
 	int rc = 0;
 
 	conn->conn_hdr = NULL;
@@ -1585,6 +1586,15 @@ process_message(uzfs_mgmt_conn_t *conn)
 			uzfs_zinfo_drop_refcnt(zinfo);
 			LOGERRCONN(conn, "Target used invalid connection for "
 			    "zvol %s", resize_data->volname);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
+			break;
+		}
+		vol_size = ZVOL_VOLUME_SIZE(zinfo->main_zv);
+		if (resize_data->size < vol_size) {
+			LOGERRCONN(conn, "Failed to resize main volume %s, "
+			    "resizing from %lu to %lu is not allowed",
+			    zinfo->name, vol_size, resize_data->size);
+			uzfs_zinfo_drop_refcnt(zinfo);
 			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
 		}
