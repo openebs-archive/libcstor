@@ -112,3 +112,70 @@ uzfs_zvol_mgmt_get_handshake_info_ver_5(zvol_io_hdr_t *in_hdr, const char *name,
 
 	return (0);
 }
+
+/*
+ * Sanitizes the START_REBUILD request payload.
+ * Starts rebuild thread to every helping replica
+ */
+int
+uzfs_zinfo_rebuild_start_threads_ver_5(mgmt_ack_ver_5_t *mack,
+    zvol_info_t *zinfo, int rebuild_op_cnt)
+{
+	int 			io_sfd = -1;
+	rebuild_thread_arg_t	*thrd_arg;
+	kthread_t		*thrd_info;
+	for (; rebuild_op_cnt > 0; rebuild_op_cnt--, mack++) {
+		if (uzfs_zvol_name_compare(zinfo, mack->dw_volname) != 0) {
+			LOG_ERR("zvol %s not matching with zinfo %s",
+			    mack->dw_volname, zinfo->name);
+ret_error:
+			mutex_enter(&zinfo->main_zv->rebuild_mtx);
+
+			/* Error happened, so set to REBUILD_ERRORED state */
+			uzfs_zvol_set_rebuild_status(zinfo->main_zv,
+			    ZVOL_REBUILDING_ERRORED);
+
+			(zinfo->main_zv->rebuild_info.rebuild_failed_cnt) +=
+			    rebuild_op_cnt;
+			(zinfo->main_zv->rebuild_info.rebuild_done_cnt) +=
+			    rebuild_op_cnt;
+
+			/*
+			 * If all the triggered rebuilds are done,
+			 * mark state as REBUILD_FAILED
+			 */
+			if (zinfo->main_zv->rebuild_info.rebuild_cnt ==
+			    zinfo->main_zv->rebuild_info.rebuild_done_cnt)
+				uzfs_zvol_set_rebuild_status(zinfo->main_zv,
+				    ZVOL_REBUILDING_FAILED);
+
+			mutex_exit(&zinfo->main_zv->rebuild_mtx);
+			return (-1);
+		}
+
+		io_sfd = create_and_bind("", B_FALSE, B_FALSE);
+		if (io_sfd < 0) {
+			/* Fail this rebuild process entirely */
+			LOG_ERR("Rebuild IO socket create and bind"
+			    " failed on zvol: %s", zinfo->name);
+			goto ret_error;
+		}
+
+		LOG_INFO("[%s:%d] at %s:%u helping in rebuild",
+		    mack->volname, io_sfd, mack->ip, mack->port);
+		uzfs_zinfo_take_refcnt(zinfo);
+
+		thrd_arg = kmem_alloc(sizeof (rebuild_thread_arg_t), KM_SLEEP);
+		thrd_arg->zinfo = zinfo;
+		thrd_arg->fd = io_sfd;
+		thrd_arg->port = mack->port;
+		strlcpy(thrd_arg->ip, mack->ip, MAX_IP_LEN);
+		strlcpy(thrd_arg->zvol_name, mack->volname, MAXNAMELEN);
+		thrd_info = zk_thread_create(NULL, 0,
+		    dw_replica_fn, thrd_arg, 0, NULL, TS_RUN, 0,
+		    PTHREAD_CREATE_DETACHED);
+		VERIFY3P(thrd_info, !=, NULL);
+	}
+
+	return (0);
+}

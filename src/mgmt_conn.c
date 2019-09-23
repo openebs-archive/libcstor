@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -99,6 +99,8 @@ static int move_to_next_state(uzfs_mgmt_conn_t *conn);
 extern int uzfs_zvol_mgmt_get_handshake_info_ver_5(zvol_io_hdr_t *in_hdr,
     const char *name, zvol_info_t *zinfo, zvol_io_hdr_t *out_hdr,
 	mgmt_ack_ver_5_t *mgmt_ack);
+extern int uzfs_zinfo_rebuild_start_threads_ver_5(mgmt_ack_ver_5_t *,
+    zvol_info_t *, int);
 /*
  * Remove connection FD from poll set and close the FD.
  */
@@ -1237,10 +1239,17 @@ ret_error:
  */
 static int
 uzfs_zvol_rebuild_dw_replica_start(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
-    mgmt_ack_t *mack, zvol_info_t *zinfo, int rebuild_op_cnt)
+    void *payload, zvol_info_t *zinfo, int rebuild_op_cnt)
 {
 	int rc;
-	rc = uzfs_zinfo_rebuild_start_threads(mack, zinfo, rebuild_op_cnt);
+
+	if (hdrp->version < REPLICA_VERSION) {
+		rc = uzfs_zinfo_rebuild_start_threads_ver_5(
+		    (mgmt_ack_ver_5_t *)payload, zinfo, rebuild_op_cnt);
+	} else {
+		rc = uzfs_zinfo_rebuild_start_threads(
+		    (mgmt_ack_t *)payload, zinfo, rebuild_op_cnt);
+	}
 	if (rc != 0)
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	return (reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp));
@@ -1284,20 +1293,37 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
     void *payload, size_t payload_size)
 {
 	int rc = 0;
+	int rebuild_op_cnt = 0;
 	zvol_info_t *zinfo;
 	zvol_status_t status;
 	zvol_rebuild_status_t rstatus;
+	boolean_t older_replica = B_FALSE;
+	mgmt_ack_t *mack = NULL;
+	mgmt_ack_ver_5_t *mack_ver_5 = NULL;
+
+	if (hdrp->version < REPLICA_VERSION)
+		older_replica = B_TRUE;
 
 	/* Invalid payload size */
-	if ((payload_size == 0) || (payload_size % sizeof (mgmt_ack_t)) != 0) {
+	if ((payload_size == 0) ||
+	    (!older_replica &&
+	    (payload_size % sizeof (mgmt_ack_t)) != 0) ||
+	    (older_replica &&
+	    (payload_size % sizeof (mgmt_ack_ver_5_t)) != 0))	{
 		LOG_ERR("rebuilding failed.. response is invalid");
 		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
 	/* Find matching zinfo for given downgraded replica */
-	mgmt_ack_t *mack = (mgmt_ack_t *)payload;
-	zinfo = uzfs_zinfo_lookup(mack->dw_volname);
+	if (older_replica) {
+		mack_ver_5 = (mgmt_ack_ver_5_t *)payload;
+		zinfo = uzfs_zinfo_lookup(mack_ver_5->dw_volname);
+	} else {
+		mack = (mgmt_ack_t *)payload;
+		zinfo = uzfs_zinfo_lookup(mack->dw_volname);
+	}
+
 	if ((zinfo == NULL) || (zinfo->mgmt_conn != conn) ||
 	    (zinfo->main_zv == NULL)) {
 		if (zinfo != NULL) {
@@ -1336,7 +1362,8 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	/*
 	 * Case where just one replica is being used by customer
 	 */
-	if ((strcmp(mack->volname, "")) == 0) {
+	if ((!older_replica && (strcmp(mack->volname, "")) == 0) ||
+	    (older_replica && (strcmp(mack_ver_5->volname, "")) == 0))	{
 		memset(&zinfo->main_zv->rebuild_info, 0,
 		    sizeof (zvol_rebuild_info_t));
 		/* Mark replica healthy now */
@@ -1365,13 +1392,28 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		goto end;
 	}
 
-	int rebuild_op_cnt = (payload_size / sizeof (mgmt_ack_t));
+	if (older_replica) {
+		rebuild_op_cnt = (payload_size / sizeof (mgmt_ack_ver_5_t));
+		mack_ver_5 = payload;
+	} else {
+		rebuild_op_cnt = (payload_size / sizeof (mgmt_ack_t));
+		mack = payload;
+	}
+
 	int loop_cnt;
 	uint64_t max_ioseq;
-	for (loop_cnt = 0, max_ioseq = 0, mack = payload;
-	    loop_cnt < rebuild_op_cnt; loop_cnt++, mack++)
-		if (max_ioseq < mack->checkpointed_io_seq)
-			max_ioseq = mack->checkpointed_io_seq;
+	for (loop_cnt = 0, max_ioseq = 0;
+	    loop_cnt < rebuild_op_cnt; loop_cnt++) {
+		if (older_replica) {
+			if (max_ioseq < mack_ver_5->checkpointed_io_seq)
+				max_ioseq = mack_ver_5->checkpointed_io_seq;
+			mack_ver_5++;
+		} else {
+			if (max_ioseq < mack->checkpointed_io_seq)
+				max_ioseq = mack->checkpointed_io_seq;
+			mack++;
+		}
+	}
 
 	if ((zinfo->checkpointed_ionum < max_ioseq) &&
 	    (rebuild_op_cnt != 1)) {
