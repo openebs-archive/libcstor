@@ -33,6 +33,7 @@ extern "C" {
 #define	uZFS_ZVOL_WORKERS_DEFAULT 6
 #define	ZFS_PROP_TARGET_IP	"io.openebs:targetip"
 #define	ZFS_PROP_ZVOL_WORKERS	"io.openebs:zvol_workers"
+#define	ZFS_PROP_ZVOL_REPLICA_ID	"io.openebs:zvol_replica_id"
 
 #define	REBUILD_IO_SERVER_PORT	3233
 #define	IO_SERVER_PORT	3232
