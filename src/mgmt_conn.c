@@ -96,7 +96,9 @@ int epollfd = -1;
 char *target_addr;
 
 static int move_to_next_state(uzfs_mgmt_conn_t *conn);
-
+extern int uzfs_zvol_mgmt_get_handshake_info_ver_5(zvol_io_hdr_t *in_hdr,
+    const char *name, zvol_info_t *zinfo, zvol_io_hdr_t *out_hdr,
+	mgmt_ack_ver_5_t *mgmt_ack);
 /*
  * Remove connection FD from poll set and close the FD.
  */
@@ -523,6 +525,7 @@ uzfs_zvol_mgmt_get_handshake_info(zvol_io_hdr_t *in_hdr, const char *name,
 	 */
 	mgmt_ack->zvol_guid = dsl_dataset_phys(
 	    zv->zv_objset->os_dsl_dataset)->ds_guid;
+	mgmt_ack->replica_id = zv->zv_replica_id;
 	if (zinfo->zvol_guid == 0)
 		zinfo->zvol_guid = mgmt_ack->zvol_guid;
 	LOG_INFO("Volume:%s has zvol_guid:%lu", zinfo->name, zinfo->zvol_guid);
@@ -558,11 +561,23 @@ uzfs_zvol_mgmt_do_handshake(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
     const char *name, zvol_info_t *zinfo)
 {
 	mgmt_ack_t 	mgmt_ack;
+	mgmt_ack_ver_5_t mgmt_ack_ver_5;
 	zvol_io_hdr_t	hdr;
-	if (uzfs_zvol_mgmt_get_handshake_info(hdrp, name, zinfo, &hdr,
-	    &mgmt_ack) != 0)
-		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
-	return (reply_data(conn, &hdr, &mgmt_ack, sizeof (mgmt_ack)));
+
+	if (hdrp->version < REPLICA_VERSION) {
+		if (uzfs_zvol_mgmt_get_handshake_info_ver_5(hdrp,
+		    name, zinfo, &hdr, &mgmt_ack_ver_5) != 0)
+			return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
+			    hdrp));
+		return (reply_data(conn, &hdr, &mgmt_ack_ver_5,
+		    sizeof (mgmt_ack_ver_5)));
+	} else {
+		if (uzfs_zvol_mgmt_get_handshake_info(hdrp, name,
+		    zinfo, &hdr, &mgmt_ack) != 0)
+			return (reply_nodata(conn,
+			    ZVOL_OP_STATUS_FAILED, hdrp));
+		return (reply_data(conn, &hdr, &mgmt_ack, sizeof (mgmt_ack)));
+	}
 }
 
 static int

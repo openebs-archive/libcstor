@@ -40,7 +40,7 @@ extern "C" {
 #define	MIN_SUPPORTED_REPLICA_VERSION	3
 
 #define	RESIZE_REBUILD_MIN_VERSION	5
-#define	REPLICA_VERSION	5
+#define	REPLICA_VERSION	6
 #define	MAX_NAME_LEN	256
 #define	MAX_IP_LEN	64
 #define	TARGET_PORT	6060
@@ -142,7 +142,7 @@ typedef struct zvol_op_open_data_ver_3 zvol_op_open_data_ver_3_t;
  * Payload data send in response to handshake on control connection. It tells
  * IP, port where replica listens for data connection to zvol.
  */
-struct mgmt_ack {
+struct mgmt_ack_ver_5 {
 	uint64_t	pool_guid;
 	uint64_t	zvol_guid;
 	uint16_t	port;
@@ -157,7 +157,27 @@ struct mgmt_ack {
 	uint64_t	checkpointed_degraded_io_seq;
 } __attribute__((packed));
 
+typedef struct mgmt_ack_ver_5 mgmt_ack_ver_5_t;
+
+struct mgmt_ack {
+	uint64_t	pool_guid;
+	uint64_t	zvol_guid;
+	uint16_t	port;
+	uint8_t		quorum;
+	uint8_t		reserved[5];
+	char		ip[MAX_IP_LEN];
+	char		volname[MAX_NAME_LEN]; // zvol helping rebuild
+	char		dw_volname[MAX_NAME_LEN]; // zvol being rebuilt
+	// checkpointed io_seq when vol is healthy
+	uint64_t	checkpointed_io_seq;
+	// checkpointed io_seq when vol is in degraded state
+	uint64_t	checkpointed_degraded_io_seq;
+	// replica ID
+	uint64_t	replica_id;
+} __attribute__((packed));
+
 typedef struct mgmt_ack mgmt_ack_t;
+
 
 /*
  * zvol rebuild related state

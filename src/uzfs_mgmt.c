@@ -505,13 +505,11 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 	nvpair_t *elem = NULL;
 	nvlist_t *nv = NULL;
 	char *ip = NULL, *replica_id = NULL, *zvol_workers = NULL;
-	const char *propname;
 	zpool_prop_t prop;
 	int error = 0;
 
 	while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
-		propname = nvpair_name(elem);
-		prop = zfs_name_to_prop(propname);
+		prop = zfs_name_to_prop(nvpair_name(elem));
 
 		switch (prop) {
 			case ZFS_PROP_REPLICA_ID:
