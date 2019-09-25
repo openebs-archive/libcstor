@@ -528,12 +528,8 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 				}
 
 				if (!error) {
-					zv->zv_replica_id =
-					    (uint64_t)strtoul(replica_id,
-					    NULL, 10);
-					if (zv->zv_replica_id == 0) {
-						error = SET_ERROR(EINVAL);
-					}
+					strncpy(zv->zv_replica_id, replica_id,
+					    REPLICA_ID_LEN);
 				}
 				break;
 			case ZFS_PROP_TARGETIP:

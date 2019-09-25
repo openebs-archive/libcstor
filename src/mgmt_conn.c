@@ -527,7 +527,7 @@ uzfs_zvol_mgmt_get_handshake_info(zvol_io_hdr_t *in_hdr, const char *name,
 	 */
 	mgmt_ack->zvol_guid = dsl_dataset_phys(
 	    zv->zv_objset->os_dsl_dataset)->ds_guid;
-	mgmt_ack->replica_id = zv->zv_replica_id;
+	strncpy(mgmt_ack->replica_id, zv->zv_replica_id, REPLICA_ID_LEN);
 	if (zinfo->zvol_guid == 0)
 		zinfo->zvol_guid = mgmt_ack->zvol_guid;
 	LOG_INFO("Volume:%s has zvol_guid:%lu", zinfo->name, zinfo->zvol_guid);

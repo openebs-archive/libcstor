@@ -44,6 +44,7 @@ extern "C" {
 #define	MAX_NAME_LEN	256
 #define	MAX_IP_LEN	64
 #define	TARGET_PORT	6060
+#define REPLICA_ID_LEN  32
 
 #define	ZVOL_OP_FLAG_REBUILD		0x01
 #define	ZVOL_OP_FLAG_READ_METADATA	0x02
@@ -173,7 +174,7 @@ struct mgmt_ack {
 	// checkpointed io_seq when vol is in degraded state
 	uint64_t	checkpointed_degraded_io_seq;
 	// replica ID
-	uint64_t	replica_id;
+	char    replica_id[REPLICA_ID_LEN];
 } __attribute__((packed));
 
 typedef struct mgmt_ack mgmt_ack_t;

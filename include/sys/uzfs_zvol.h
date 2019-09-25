@@ -86,7 +86,8 @@ struct zvol_state {
 	 */
 	uint64_t zv_metavolblocksize;
 
-	uint64_t zv_replica_id;	/* replica ID to identify dataset */
+	/* replica ID to identify dataset  */
+	char    zv_replica_id[REPLICA_ID_LEN];
 
 	/* Don't use status directly. Use getter/setter of zvol_info */
 	zvol_status_t zv_status;		/* zvol status */
