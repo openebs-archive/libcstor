@@ -25,8 +25,7 @@ EXTRA_DIST = \
 			 uzfs_zap.c \
 			 vdev_disk_aio.c \
 			 zrepl_mgmt.c	\
-			 uzfs_test_mgmt.c \
-			 mgmt_conn_ver_5.c
+			 uzfs_test_mgmt.c
 
 nodist_libcstor_la_SOURCES = $(EXTRA_DIST)
 

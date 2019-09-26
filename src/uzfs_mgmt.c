@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -504,73 +504,50 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 {
 	nvpair_t *elem = NULL;
 	nvlist_t *nv = NULL;
-	char *ip = NULL, *replica_id = NULL, *zvol_workers = NULL;
+	char *ip = NULL, *replica_id = NULL;
+	char *val = NULL;
 	zpool_prop_t prop;
 	int error = 0;
 
 	while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
 		prop = zfs_name_to_prop(nvpair_name(elem));
+		val = NULL;
 
 		switch (prop) {
 			case ZFS_PROP_REPLICA_ID:
-				if (nvpair_type(elem) == DATA_TYPE_NVLIST) {
-					error = nvpair_value_nvlist(elem, &nv);
-					if (error == 0) {
-						error = nvlist_lookup_string(nv,
-						    ZPROP_VALUE, &replica_id);
-					}
-				} else if (nvpair_type(elem) ==
-				    DATA_TYPE_STRING) {
-					error = nvpair_value_string(elem,
-					    &replica_id);
-				} else {
-					error = SET_ERROR(EINVAL);
-				}
-
-				if (!error) {
-					strncpy(zv->zv_replica_id, replica_id,
-					    REPLICA_ID_LEN);
-				}
-				break;
 			case ZFS_PROP_TARGETIP:
-				if (nvpair_type(elem) == DATA_TYPE_NVLIST) {
-					error = nvpair_value_nvlist(elem, &nv);
-					if (error == 0) {
-						error = nvlist_lookup_string(nv,
-						    ZPROP_VALUE, &ip);
-					}
-				} else if (nvpair_type(elem) ==
-				    DATA_TYPE_STRING) {
-					error = nvpair_value_string(elem, &ip);
-				} else {
-					error = SET_ERROR(EINVAL);
-				}
-				if (!error)
-					strncpy(zv->zv_target_host, ip,
-					    sizeof (zv->zv_target_host));
-				break;
 			case ZFS_PROP_WORKERS:
 				if (nvpair_type(elem) == DATA_TYPE_NVLIST) {
 					error = nvpair_value_nvlist(elem, &nv);
 					if (error == 0) {
 						error = nvlist_lookup_string(nv,
-						    ZPROP_VALUE, &zvol_workers);
+						    ZPROP_VALUE, &val);
 					}
 				} else if (nvpair_type(elem) ==
 				    DATA_TYPE_STRING) {
 					error = nvpair_value_string(elem,
-					    &zvol_workers);
+					    &val);
 				} else {
 					error = SET_ERROR(EINVAL);
 				}
-				if (!error)
-					zv->zvol_workers =
-					    (uint8_t)strtol(zvol_workers,
+
+				if (error)
+					break;
+
+				if (prop == ZFS_PROP_REPLICA_ID) {
+					strncpy(zv->zv_replica_id, val,
+					    REPLICA_ID_LEN);
+				} else if (prop == ZFS_PROP_TARGETIP) {
+					strncpy(zv->zv_target_host, val,
+					    sizeof (zv->zv_target_host));
+				} else if (prop == ZFS_PROP_WORKERS) {
+					zv->zvol_workers = (uint8_t)strtol(val,
 					    NULL, 10);
+				}
 				break;
 		}
 		if (error) {
-			LOG_ERR("Invalid(%d) property(%s) for %s",
+			LOG_ERR("Invalid(%d) property(%s) value for %s",
 			    error, zfs_prop_to_name(prop), zv->zv_name);
 			break;
 		}
@@ -617,12 +594,6 @@ uzfs_zvol_create_cb(const char *ds_name, void *arg)
 			uzfs_close_dataset(zv);
 			return (0);
 		}
-	}
-
-	if (zv->zv_replica_id == 0) {
-		LOG_ERR("Replica ID is not set for %s", ds_name);
-		uzfs_close_dataset(zv);
-		return (0);
 	}
 
 	if (zv->zv_target_host[0] == '\0') {

@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -41,10 +41,13 @@ extern "C" {
 
 #define	RESIZE_REBUILD_MIN_VERSION	5
 #define	REPLICA_VERSION	6
+#define	REPLICA_VERSION_5	5
+#define	REPLICA_VERSION_4	4
+#define	REPLICA_VERSION_3	3
 #define	MAX_NAME_LEN	256
 #define	MAX_IP_LEN	64
 #define	TARGET_PORT	6060
-#define REPLICA_ID_LEN  32
+#define	REPLICA_ID_LEN	32
 
 #define	ZVOL_OP_FLAG_REBUILD		0x01
 #define	ZVOL_OP_FLAG_READ_METADATA	0x02
@@ -143,23 +146,6 @@ typedef struct zvol_op_open_data_ver_3 zvol_op_open_data_ver_3_t;
  * Payload data send in response to handshake on control connection. It tells
  * IP, port where replica listens for data connection to zvol.
  */
-struct mgmt_ack_ver_5 {
-	uint64_t	pool_guid;
-	uint64_t	zvol_guid;
-	uint16_t	port;
-	uint8_t		quorum;
-	uint8_t		reserved[5];
-	char		ip[MAX_IP_LEN];
-	char		volname[MAX_NAME_LEN]; // zvol helping rebuild
-	char		dw_volname[MAX_NAME_LEN]; // zvol being rebuilt
-	// checkpointed io_seq when vol is healthy
-	uint64_t	checkpointed_io_seq;
-	// checkpointed io_seq when vol is in degraded state
-	uint64_t	checkpointed_degraded_io_seq;
-} __attribute__((packed));
-
-typedef struct mgmt_ack_ver_5 mgmt_ack_ver_5_t;
-
 struct mgmt_ack {
 	uint64_t	pool_guid;
 	uint64_t	zvol_guid;
@@ -178,6 +164,45 @@ struct mgmt_ack {
 } __attribute__((packed));
 
 typedef struct mgmt_ack mgmt_ack_t;
+
+/*
+ * Payload data send in response to handshake on control connection. It tells
+ * IP, port where replica listens for data connection to zvol.
+ * For replica having version < 6
+ */
+struct mgmt_ack_ver_5 {
+	uint64_t	pool_guid;
+	uint64_t	zvol_guid;
+	uint16_t	port;
+	uint8_t		quorum;
+	uint8_t		reserved[5];
+	char		ip[MAX_IP_LEN];
+	char		volname[MAX_NAME_LEN]; // zvol helping rebuild
+	char		dw_volname[MAX_NAME_LEN]; // zvol being rebuilt
+	// checkpointed io_seq when vol is healthy
+	uint64_t	checkpointed_io_seq;
+	// checkpointed io_seq when vol is in degraded state
+	uint64_t	checkpointed_degraded_io_seq;
+} __attribute__((packed));
+
+typedef struct mgmt_ack_ver_5 mgmt_ack_ver_5_t;
+
+struct rebuild_req {
+	uint64_t	pool_guid;
+	uint64_t	zvol_guid;
+	uint16_t	port;
+	uint8_t		quorum;
+	uint8_t		reserved[5];
+	char		ip[MAX_IP_LEN];
+	char		volname[MAX_NAME_LEN]; // zvol helping rebuild
+	char		dw_volname[MAX_NAME_LEN]; // zvol being rebuilt
+	// checkpointed io_seq when vol is healthy
+	uint64_t	checkpointed_io_seq;
+	// checkpointed io_seq when vol is in degraded state
+	uint64_t	checkpointed_degraded_io_seq;
+} __attribute__((packed));
+
+typedef struct rebuild_req rebuild_req_t;
 
 
 /*
