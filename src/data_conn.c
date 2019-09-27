@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -1607,7 +1607,8 @@ handle_afs_transition(zvol_info_t *zinfo, zvol_rebuild_scanner_info_t *warg)
 			    zinfo->name, rc);
 			rc = -1;
 		} else if (hdr.opcode != ZVOL_OPCODE_AFS_STARTED) {
-			LOG_ERR("afs started not received zvol = %s", zinfo->name);
+			LOG_ERR("afs started not received zvol = %s",
+			    zinfo->name);
 			rc = -1;
 		}
 	}
@@ -1756,15 +1757,15 @@ retry:
 					    " %s, err(%d)", zinfo->name, rc);
 					goto exit;
 				}
-				if (snap_zv != NULL) {
-					if (warg->version >= RESIZE_REBUILD_MIN_VERSION) {
-						uint64_t volsize =
-						    ZVOL_VOLUME_SIZE(snap_zv);
-						uzfs_zvol_send_zio_cmd(zinfo, &hdr,
-						    ZVOL_OPCODE_REBUILD_SNAP_START,
-						    fd, (char *)&volsize,
-						    sizeof (volsize), 0, warg);
-					}
+				if (snap_zv != NULL &&
+				    (warg->version >=
+				    RESIZE_REBUILD_MIN_VERSION)) {
+					uint64_t volsize =
+					    ZVOL_VOLUME_SIZE(snap_zv);
+					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
+					    ZVOL_OPCODE_REBUILD_SNAP_START,
+					    fd, (char *)&volsize,
+					    sizeof (volsize), 0, warg);
 					LOG_INFO("Rebuilding from zv:%s\n",
 					    snap_zv->zv_name);
 				}
@@ -1806,8 +1807,10 @@ retry:
 					    " err(%d)", zinfo->name, rc);
 					goto exit;
 				}
-				if (warg->version >= RESIZE_REBUILD_MIN_VERSION) {
-					uint64_t volsize = ZVOL_VOLUME_SIZE(snap_zv);
+				if (warg->version >=
+				    RESIZE_REBUILD_MIN_VERSION) {
+					uint64_t volsize =
+					    ZVOL_VOLUME_SIZE(snap_zv);
 					uzfs_zvol_send_zio_cmd(zinfo, &hdr,
 					    ZVOL_OPCODE_REBUILD_SNAP_START,
 					    fd, (char *)&volsize,
