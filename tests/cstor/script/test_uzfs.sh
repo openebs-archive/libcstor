@@ -851,8 +851,8 @@ run_fio_test()
 
 	log_must $ZPOOL create -f $fio_pool \
 	    -o cachefile="$TMPDIR/zpool_$fio_pool.cache" "/tmp/disk"
-	log_must $ZFS create -sV $VOLSIZE -o volblocksize=4k -o io.openebs:targetip=127.0.0.1:6060 $fio_pool/vol1
-	log_must $ZFS create -sV $VOLSIZE -o volblocksize=4k -o io.openebs:targetip=127.0.0.1:6060 $fio_pool/vol2
+	log_must $ZFS create -sV $VOLSIZE -o volblocksize=4k -o io.openebs:targetip=127.0.0.1:6060 -o ${PROP_REPLICA_ID}=1234 $fio_pool/vol1
+	log_must $ZFS create -sV $VOLSIZE -o volblocksize=4k -o io.openebs:targetip=127.0.0.1:6060 -o ${PROP_REPLICA_ID}=1234 $fio_pool/vol2
 	cat >$TMPDIR/test.fio <<EOF
 [global]
 ioengine=replica.so
