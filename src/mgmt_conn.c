@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -96,7 +96,6 @@ int epollfd = -1;
 char *target_addr;
 
 static int move_to_next_state(uzfs_mgmt_conn_t *conn);
-
 /*
  * Remove connection FD from poll set and close the FD.
  */
@@ -462,6 +461,19 @@ uzfs_zvol_get_ip(char *host, size_t host_len)
 	return (rc);
 }
 
+uint64_t
+get_mgmt_ack_len(zvol_io_hdr_t *hdrp)
+{
+	switch (hdrp->version) {
+		case REPLICA_VERSION_3:
+		case REPLICA_VERSION_4:
+		case REPLICA_VERSION_5:
+			return (sizeof (mgmt_ack_ver_5_t));
+		default:
+			return (sizeof (mgmt_ack_t));
+	}
+}
+
 int
 uzfs_zvol_mgmt_get_handshake_info(zvol_io_hdr_t *in_hdr, const char *name,
     zvol_info_t *zinfo, zvol_io_hdr_t *out_hdr, mgmt_ack_t *mgmt_ack)
@@ -523,6 +535,8 @@ uzfs_zvol_mgmt_get_handshake_info(zvol_io_hdr_t *in_hdr, const char *name,
 	 */
 	mgmt_ack->zvol_guid = dsl_dataset_phys(
 	    zv->zv_objset->os_dsl_dataset)->ds_guid;
+	dsl_prop_get(zv->zv_name, ZFS_PROP_ZVOL_REPLICA_ID, 1,
+	    REPLICA_ID_LEN, &mgmt_ack->replica_id, NULL);
 	if (zinfo->zvol_guid == 0)
 		zinfo->zvol_guid = mgmt_ack->zvol_guid;
 	LOG_INFO("Volume:%s has zvol_guid:%lu", zinfo->name, zinfo->zvol_guid);
@@ -531,7 +545,7 @@ uzfs_zvol_mgmt_get_handshake_info(zvol_io_hdr_t *in_hdr, const char *name,
 	out_hdr->version = in_hdr->version;
 	out_hdr->opcode = in_hdr->opcode; // HANDSHAKE or PREPARE_FOR_REBUILD
 	out_hdr->io_seq = in_hdr->io_seq;
-	out_hdr->len = sizeof (*mgmt_ack);
+	out_hdr->len = get_mgmt_ack_len(in_hdr);
 	out_hdr->status = ZVOL_OP_STATUS_OK;
 
 	zinfo->stored_healthy_ionum = zinfo->checkpointed_ionum;
@@ -559,10 +573,11 @@ uzfs_zvol_mgmt_do_handshake(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 {
 	mgmt_ack_t 	mgmt_ack;
 	zvol_io_hdr_t	hdr;
-	if (uzfs_zvol_mgmt_get_handshake_info(hdrp, name, zinfo, &hdr,
-	    &mgmt_ack) != 0)
+
+	if (uzfs_zvol_mgmt_get_handshake_info(hdrp, name,
+	    zinfo, &hdr, &mgmt_ack) != 0)
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
-	return (reply_data(conn, &hdr, &mgmt_ack, sizeof (mgmt_ack)));
+	return (reply_data(conn, &hdr, &mgmt_ack, get_mgmt_ack_len(hdrp)));
 }
 
 static int
@@ -1155,16 +1170,18 @@ uzfs_zvol_dispatch_command(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
  * Starts rebuild thread to every helping replica
  */
 static int
-uzfs_zinfo_rebuild_start_threads(mgmt_ack_t *mack, zvol_info_t *zinfo,
+uzfs_zinfo_rebuild_start_threads(void *data, zvol_info_t *zinfo,
     int rebuild_op_cnt)
 {
 	int 			io_sfd = -1;
 	rebuild_thread_arg_t	*thrd_arg;
 	kthread_t		*thrd_info;
-	for (; rebuild_op_cnt > 0; rebuild_op_cnt--, mack++) {
-		if (uzfs_zvol_name_compare(zinfo, mack->dw_volname) != 0) {
+	rebuild_req_t *req = (rebuild_req_t *)data;
+
+	for (; rebuild_op_cnt > 0; rebuild_op_cnt--, req++) {
+		if (uzfs_zvol_name_compare(zinfo, req->dw_volname) != 0) {
 			LOG_ERR("zvol %s not matching with zinfo %s",
-			    mack->dw_volname, zinfo->name);
+			    req->dw_volname, zinfo->name);
 ret_error:
 			mutex_enter(&zinfo->main_zv->rebuild_mtx);
 
@@ -1199,15 +1216,15 @@ ret_error:
 		}
 
 		LOG_INFO("[%s:%d] at %s:%u helping in rebuild",
-		    mack->volname, io_sfd, mack->ip, mack->port);
+		    req->volname, io_sfd, req->ip, req->port);
 		uzfs_zinfo_take_refcnt(zinfo);
 
 		thrd_arg = kmem_alloc(sizeof (rebuild_thread_arg_t), KM_SLEEP);
 		thrd_arg->zinfo = zinfo;
 		thrd_arg->fd = io_sfd;
-		thrd_arg->port = mack->port;
-		strlcpy(thrd_arg->ip, mack->ip, MAX_IP_LEN);
-		strlcpy(thrd_arg->zvol_name, mack->volname, MAXNAMELEN);
+		thrd_arg->port = req->port;
+		strlcpy(thrd_arg->ip, req->ip, MAX_IP_LEN);
+		strlcpy(thrd_arg->zvol_name, req->volname, MAXNAMELEN);
 		thrd_info = zk_thread_create(NULL, 0,
 		    dw_replica_fn, thrd_arg, 0, NULL, TS_RUN, 0,
 		    PTHREAD_CREATE_DETACHED);
@@ -1222,10 +1239,12 @@ ret_error:
  */
 static int
 uzfs_zvol_rebuild_dw_replica_start(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
-    mgmt_ack_t *mack, zvol_info_t *zinfo, int rebuild_op_cnt)
+    void *payload, zvol_info_t *zinfo, int rebuild_op_cnt)
 {
 	int rc;
-	rc = uzfs_zinfo_rebuild_start_threads(mack, zinfo, rebuild_op_cnt);
+
+	rc = uzfs_zinfo_rebuild_start_threads(
+	    (rebuild_req_t *)payload, zinfo, rebuild_op_cnt);
 	if (rc != 0)
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	return (reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp));
@@ -1269,20 +1288,24 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
     void *payload, size_t payload_size)
 {
 	int rc = 0;
+	int rebuild_op_cnt = 0;
 	zvol_info_t *zinfo;
 	zvol_status_t status;
 	zvol_rebuild_status_t rstatus;
+	rebuild_req_t *req = NULL;
 
 	/* Invalid payload size */
-	if ((payload_size == 0) || (payload_size % sizeof (mgmt_ack_t)) != 0) {
+	if ((payload_size == 0) ||
+	    (payload_size % sizeof (rebuild_req_t)) != 0) {
 		LOG_ERR("rebuilding failed.. response is invalid");
 		rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 		goto end;
 	}
 
 	/* Find matching zinfo for given downgraded replica */
-	mgmt_ack_t *mack = (mgmt_ack_t *)payload;
-	zinfo = uzfs_zinfo_lookup(mack->dw_volname);
+	req = (rebuild_req_t *)payload;
+	zinfo = uzfs_zinfo_lookup(req->dw_volname);
+
 	if ((zinfo == NULL) || (zinfo->mgmt_conn != conn) ||
 	    (zinfo->main_zv == NULL)) {
 		if (zinfo != NULL) {
@@ -1321,7 +1344,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	/*
 	 * Case where just one replica is being used by customer
 	 */
-	if ((strcmp(mack->volname, "")) == 0) {
+	if ((strcmp(req->volname, "")) == 0) {
 		memset(&zinfo->main_zv->rebuild_info, 0,
 		    sizeof (zvol_rebuild_info_t));
 		/* Mark replica healthy now */
@@ -1350,13 +1373,17 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 		goto end;
 	}
 
-	int rebuild_op_cnt = (payload_size / sizeof (mgmt_ack_t));
+	rebuild_op_cnt = (payload_size / sizeof (rebuild_req_t));
+	req = payload;
+
 	int loop_cnt;
 	uint64_t max_ioseq;
-	for (loop_cnt = 0, max_ioseq = 0, mack = payload;
-	    loop_cnt < rebuild_op_cnt; loop_cnt++, mack++)
-		if (max_ioseq < mack->checkpointed_io_seq)
-			max_ioseq = mack->checkpointed_io_seq;
+	for (loop_cnt = 0, max_ioseq = 0;
+	    loop_cnt < rebuild_op_cnt; loop_cnt++) {
+		if (max_ioseq < req->checkpointed_io_seq)
+			max_ioseq = req->checkpointed_io_seq;
+		req++;
+	}
 
 	if ((zinfo->checkpointed_ionum < max_ioseq) &&
 	    (rebuild_op_cnt != 1)) {

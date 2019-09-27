@@ -39,6 +39,7 @@ UZFS_REBUILD_VOL2="ds3"
 UZFS_TEST_VOLSIZE="20M"
 UZFS_TEST_VOLSIZE_IN_NUM=20971520
 ZREPL_PID="-1"
+PROP_REPLICA_ID="io.openebs:zvol_replica_id"
 
 source $UZFS_TEST_SYNC_SH
 
@@ -196,10 +197,10 @@ run_zvol_targetip_tests()
 	create_disk $pool_disk
 	log_must $ZPOOL create -f $pool -o cachefile="$TMPDIR/zpool_$pool.cache" \
 	    $pool_disk
-	log_must $ZFS create -V $VOLSIZE -o io.openebs:targetip=127.0.0.1:6060 $pool/$vol"_targetip_1"
+	log_must $ZFS create -V $VOLSIZE -o io.openebs:targetip=127.0.0.1:6060 -o ${PROP_REPLICA_ID}=12345 $pool/$vol"_targetip_1"
 	log_must test_stats_len 1
 
-	log_must $ZFS create -V $VOLSIZE $pool/$vol"_targetip_2"
+	log_must $ZFS create -V $VOLSIZE -o ${PROP_REPLICA_ID}=12345 $pool/$vol"_targetip_2"
 	log_must test_stats_len 1
 
 	log_must $ZFS set io.openebs:targetip= $pool/$vol"_targetip_1"
@@ -217,7 +218,7 @@ run_zvol_targetip_tests()
 	log_must $ZFS set io.openebs:targetip="" $pool/$vol"_targetip_1"
 	log_must test_stats_len 1
 
-	$ZFS create -V $VOLSIZE -o io.openebs:targetip=127.0.0.1:6161 $pool/$vol"_targetip_3"
+	$ZFS create -V $VOLSIZE -o io.openebs:targetip=127.0.0.1:6161 -o ${PROP_REPLICA_ID}=12345 $pool/$vol"_targetip_3"
 	log_must test_stats_len 2
 
 	log_must export_pool $pool
@@ -250,11 +251,11 @@ run_zvol_tests()
 	fi
 
 	# test volume creation
-	log_must $ZFS create -V $VOLSIZE $src_pool/$src_vol
+	log_must $ZFS create -V $VOLSIZE -o ${PROP_REPLICA_ID}=12345 $src_pool/$src_vol
 	log_must datasetexists $src_pool/$src_vol
 	log_must check_prop $src_pool/$src_vol type volume
 
-	log_must $ZFS create -V $VOLSIZE -o io.openebs:targetip=127.0.0.1:6060 -o io.openebs:zvol_workers=19 $src_pool/$src_vol"_1"
+	log_must $ZFS create -V $VOLSIZE -o io.openebs:targetip=127.0.0.1:6060 -o io.openebs:zvol_workers=19 -o ${PROP_REPLICA_ID}=1234 $src_pool/$src_vol"_1"
 
 	# test volume properties
 	log_must $ZFS get all $src_pool/$src_vol > /dev/null
@@ -312,7 +313,7 @@ run_zvol_tests()
 	log_must $ZFS destroy -r $src_pool/$src_vol"_1"
 
 	# test snap destroy
-	log_must $ZFS create -s -V $VOLSIZE $src_pool/$src_vol
+	log_must $ZFS create -s -V $VOLSIZE -o ${PROP_REPLICA_ID}=1234 $src_pool/$src_vol
 	log_must datasetexists $src_pool/$src_vol
 
 	log_must create_snapshot "$src_pool/$src_vol" "snap"
@@ -933,7 +934,7 @@ setup_uzfs_test()
 		log_must $ZPOOL create -f $pool_name "$TMPDIR/$vdev_file"
 	fi
 
-	log_must $ZFS create -V $vol_size $pool_name/$volume_name -b $block_size
+	log_must $ZFS create -V $vol_size -o ${PROP_REPLICA_ID}=1234 $pool_name/$volume_name -b $block_size
 	log_must $ZFS set sync=$sync_prop $pool_name/$volume_name
 
 	return 0
@@ -1011,15 +1012,15 @@ run_zrepl_rebuild_uzfs_test()
 	log_must $ZFS set io.openebs:targetip=127.0.0.1:6060 $UZFS_TEST_POOL/$UZFS_TEST_VOL
 
 	log_must $ZFS create -V $UZFS_TEST_VOLSIZE \
-	    -o io.openebs:targetip=127.0.0.1:99159 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL -b $2
+	    -o io.openebs:targetip=127.0.0.1:99159 -o ${PROP_REPLICA_ID}=1234 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL -b $2
 	log_must $ZFS set sync=$3 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL
-	
+
 	log_must $ZFS create -V $UZFS_TEST_VOLSIZE \
-	    -o io.openebs:targetip=127.0.0.1:99160 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL1 -b $2
+	    -o io.openebs:targetip=127.0.0.1:99160 -o ${PROP_REPLICA_ID}=1234 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL1 -b $2
 	log_must $ZFS set sync=$3 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL1
 
 	log_must $ZFS create -V $UZFS_TEST_VOLSIZE \
-	    -o io.openebs:targetip=127.0.0.1:99161 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL2 -b $2
+	    -o io.openebs:targetip=127.0.0.1:99161 -o ${PROP_REPLICA_ID}=1234 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL2 -b $2
 	log_must $ZFS set sync=$3 $UZFS_TEST_POOL/$UZFS_REBUILD_VOL2
 
 	log_must export_pool $UZFS_TEST_POOL

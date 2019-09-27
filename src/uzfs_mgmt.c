@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -27,9 +27,12 @@
 #include <uzfs_zap.h>
 #include <uzfs_rebuilding.h>
 
+#include <libnvpair.h>
 static int uzfs_fd_rand = -1;
 kmutex_t zvol_list_mutex;
 char *uzfs_spa_tag = "UZFS_SPA_TAG";
+
+int update_zvol_property(zvol_state_t *, nvlist_t *);
 
 static nvlist_t *
 make_root(char *path, int ashift, int log)
@@ -288,7 +291,7 @@ static int
 get_openebs_options(objset_t *os, zvol_state_t *zv)
 {
 	nvlist_t *props, *propval;
-	char *ip;
+	char *ip, *replica_id, *end;
 	int error;
 	dsl_pool_t *dp = spa_get_dsl(os->os_spa);
 	char *zvol_workers;
@@ -304,20 +307,7 @@ get_openebs_options(objset_t *os, zvol_state_t *zv)
 	 * useful as change of target ip using zfs set will not be picked
 	 * and need restart of zrepl.
 	 */
-	if ((error = nvlist_lookup_nvlist(props, ZFS_PROP_TARGET_IP, &propval))
-	    != 0)
-		goto end;
-	if ((error = nvlist_lookup_string(propval, ZPROP_VALUE, &ip)) != 0)
-		goto end;
-	strncpy(zv->zv_target_host, ip, sizeof (zv->zv_target_host));
-
-	if ((error = nvlist_lookup_nvlist(props, ZFS_PROP_ZVOL_WORKERS,
-	    &propval)) != 0)
-		goto end;
-	if (nvlist_lookup_string(propval, ZPROP_VALUE, &zvol_workers) != 0)
-		goto end;
-	zv->zvol_workers = (uint8_t)strtol(zvol_workers, NULL, 10);
-end:
+	error = update_zvol_property(zv, props);
 	nvlist_free(props);
 	return (error);
 }
@@ -506,6 +496,62 @@ is_internally_created_clone_volume(const char *ds_name)
 }
 
 /*
+ * update_zvol_property updates the zv values
+ * according to given property 'nvprops'
+ */
+int
+update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
+{
+	nvpair_t *elem = NULL;
+	nvlist_t *nv = NULL;
+	char *ip = NULL, *replica_id = NULL;
+	char *val = NULL;
+	zpool_prop_t prop;
+	int error = 0;
+
+	while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
+		prop = zfs_name_to_prop(nvpair_name(elem));
+		val = NULL;
+
+		switch (prop) {
+			case ZFS_PROP_TARGETIP:
+			case ZFS_PROP_WORKERS:
+				if (nvpair_type(elem) == DATA_TYPE_NVLIST) {
+					error = nvpair_value_nvlist(elem, &nv);
+					if (error == 0) {
+						error = nvlist_lookup_string(nv,
+						    ZPROP_VALUE, &val);
+					}
+				} else if (nvpair_type(elem) ==
+				    DATA_TYPE_STRING) {
+					error = nvpair_value_string(elem,
+					    &val);
+				} else {
+					error = SET_ERROR(EINVAL);
+				}
+
+				if (error)
+					break;
+
+				if (prop == ZFS_PROP_TARGETIP) {
+					strncpy(zv->zv_target_host, val,
+					    sizeof (zv->zv_target_host));
+				} else if (prop == ZFS_PROP_WORKERS) {
+					zv->zvol_workers = (uint8_t)strtol(val,
+					    NULL, 10);
+				}
+				break;
+		}
+		if (error) {
+			LOG_ERR("Invalid(%d) property(%s) value for %s",
+			    error, zfs_prop_to_name(prop), zv->zv_name);
+			break;
+		}
+	}
+	return (error);
+}
+
+/*
  * uZFS Zvol create call back function
  * Returning 0 in error cases also so that dmu_objset_find_impl will execute
  * this function for all zvols
@@ -539,28 +585,19 @@ uzfs_zvol_create_cb(const char *ds_name, void *arg)
 
 	/* if zvol is being created, read target address from nvlist */
 	if (nvprops != NULL) {
-		error = nvlist_lookup_string(nvprops, ZFS_PROP_TARGET_IP, &ip);
-		if (error == 0)
-			strncpy(zv->zv_target_host, ip,
-			    sizeof (zv->zv_target_host));
-		else {
-			LOG_ERR("target IP address is not set for %s", ds_name);
-			uzfs_close_dataset(zv);
-			return (0);
-		}
-
-		error = nvlist_lookup_string(nvprops, ZFS_PROP_ZVOL_WORKERS,
-		    &zvol_workers);
-		if (error == 0)
-			zv->zvol_workers = (uint8_t)strtol(zvol_workers, NULL,
-			    10);
-	} else {
-		if (zv->zv_target_host[0] == '\0') {
-			LOG_ERR("target IP address is empty for %s", ds_name);
+		error = update_zvol_property(zv, nvprops);
+		if (error) {
 			uzfs_close_dataset(zv);
 			return (0);
 		}
 	}
+
+	if (zv->zv_target_host[0] == '\0') {
+		LOG_ERR("target IP address is empty for %s", ds_name);
+		uzfs_close_dataset(zv);
+		return (0);
+	}
+
 	uzfs_zinfo_init(zv, ds_name, nvprops);
 
 	return (0);
