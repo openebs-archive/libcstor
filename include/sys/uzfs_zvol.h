@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
-
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -85,9 +85,6 @@ struct zvol_state {
 	 * This should not be greater than volblocksize
 	 */
 	uint64_t zv_metavolblocksize;
-
-	/* replica ID to identify dataset  */
-	char    zv_replica_id[REPLICA_ID_LEN];
 
 	/* Don't use status directly. Use getter/setter of zvol_info */
 	zvol_status_t zv_status;		/* zvol status */

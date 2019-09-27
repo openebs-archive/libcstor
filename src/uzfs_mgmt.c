@@ -514,7 +514,6 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 		val = NULL;
 
 		switch (prop) {
-			case ZFS_PROP_REPLICA_ID:
 			case ZFS_PROP_TARGETIP:
 			case ZFS_PROP_WORKERS:
 				if (nvpair_type(elem) == DATA_TYPE_NVLIST) {
@@ -534,10 +533,7 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 				if (error)
 					break;
 
-				if (prop == ZFS_PROP_REPLICA_ID) {
-					strncpy(zv->zv_replica_id, val,
-					    REPLICA_ID_LEN);
-				} else if (prop == ZFS_PROP_TARGETIP) {
+				if (prop == ZFS_PROP_TARGETIP) {
 					strncpy(zv->zv_target_host, val,
 					    sizeof (zv->zv_target_host));
 				} else if (prop == ZFS_PROP_WORKERS) {
