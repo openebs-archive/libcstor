@@ -57,7 +57,6 @@ install:
     - sh autogen.sh
     - ./configure --enable-debug --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
     - make -j4
-    - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
     - sudo make install
     - sudo ldconfig
     - cd ..
@@ -65,6 +64,13 @@ install:
     - sh autogen.sh
     - ./configure --with-config=user --enable-code-coverage=yes --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
     - make -j4;
+    # return to libcstor code to run lint checks
+    - cd ..
+    - cd libcstor
+    - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
+    # back to cstor for running further tests.
+    - cd ..
+    - cd cstor
 script:
     export FIO_SRCDIR=$PWD/../fio;
     sudo bash ./print_debug_info.sh &
