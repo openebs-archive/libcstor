@@ -57,7 +57,6 @@ install:
     - sh autogen.sh
     - ./configure --enable-debug --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
     - make -j4
-    - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
     - sudo make install
     - sudo ldconfig
     - cd ..
