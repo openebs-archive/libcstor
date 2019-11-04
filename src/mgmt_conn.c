@@ -1279,6 +1279,23 @@ uzfs_zinfo_rebuild_from_clone(zvol_info_t *zinfo)
 }
 
 /*
+ * This function returns TRUE if success can be sent to target
+ */
+static boolean_t
+can_start_rebuild_return_success(zvol_info_t *zinfo, char *volname) {
+	zvol_status_t status = uzfs_zinfo_get_status(zinfo);
+	zvol_rebuild_status_t rstatus = uzfs_zvol_get_rebuild_status(
+	    zinfo->main_zv);
+
+	// In single replica case target will send payload size as 0
+	// Return TRUE if status is HEALTHY and rebuild_status is DONE
+	if ((strcmp(volname, "")==0) && (status == ZVOL_STATUS_HEALTHY) &&
+	    (rstatus == ZVOL_REBUILDING_DONE))
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+/*
  * Sanitizes START_REBUILD request, its header.
  * Handles rebuild for single replica case.
  * Calls API to start threads with every helping replica to rebuild
@@ -1320,7 +1337,16 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 
-	/* Check zinfo status */
+	// This migt be single replica case
+	if (can_start_rebuild_return_success(zinfo, req->volname)) {
+		mutex_exit(&zinfo->main_zv->rebuild_mtx);
+		LOG_INFO("Rebuilding success for %s due to single replica "
+		    "%s", zinfo->name);
+		uzfs_zinfo_drop_refcnt(zinfo);
+		rc = reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp);
+		goto end;
+	}
+
 	if ((status = uzfs_zinfo_get_status(zinfo)) != ZVOL_STATUS_DEGRADED) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		LOG_ERR("rebuilding failed for %s due to improper zinfo "
