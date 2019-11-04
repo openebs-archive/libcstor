@@ -1282,14 +1282,15 @@ uzfs_zinfo_rebuild_from_clone(zvol_info_t *zinfo)
  * This function returns TRUE if success can be sent to target
  */
 static boolean_t
-can_start_rebuild_return_success(zvol_info_t *zinfo, char *volname) {
+can_start_rebuild_return_success(zvol_info_t *zinfo, char *volname)
+{
 	zvol_status_t status = uzfs_zinfo_get_status(zinfo);
 	zvol_rebuild_status_t rstatus = uzfs_zvol_get_rebuild_status(
 	    zinfo->main_zv);
 
 	// In single replica case target will send payload size as 0
 	// Return TRUE if status is HEALTHY and rebuild_status is DONE
-	if ((strcmp(volname, "")==0) && (status == ZVOL_STATUS_HEALTHY) &&
+	if ((strcmp(volname, "") == 0) && (status == ZVOL_STATUS_HEALTHY) &&
 	    (rstatus == ZVOL_REBUILDING_DONE))
 		return (B_TRUE);
 	return (B_FALSE);
