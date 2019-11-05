@@ -1282,16 +1282,18 @@ uzfs_zinfo_rebuild_from_clone(zvol_info_t *zinfo)
  * This function returns TRUE if success can be sent to target
  */
 static boolean_t
-can_start_rebuild_return_success(zvol_info_t *zinfo, char *volname)
+start_rebuild_opcode_on_healthy_replica(zvol_info_t *zinfo, char *volname)
 {
 	zvol_status_t status = uzfs_zinfo_get_status(zinfo);
 	zvol_rebuild_status_t rstatus = uzfs_zvol_get_rebuild_status(
 	    zinfo->main_zv);
+	uint8_t quorum = uzfs_zinfo_get_quorum(zinfo);
 
-	// In single replica case target will send payload size as 0
-	// Return TRUE if status is HEALTHY and rebuild_status is DONE
-	if ((strcmp(volname, "") == 0) && (status == ZVOL_STATUS_HEALTHY) &&
-	    (rstatus == ZVOL_REBUILDING_DONE))
+	// In single replica case target will not send any volname(payload
+	// will contains only dw_volname) Return TRUE if status is HEALTHY
+	// and rebuild_status is DONE
+	if ((volname[0] == '\0') && (status == ZVOL_STATUS_HEALTHY) &&
+	    (rstatus == ZVOL_REBUILDING_DONE) && (quorum == 1))
 		return (B_TRUE);
 	return (B_FALSE);
 }
@@ -1338,11 +1340,11 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 
-	// This migt be single replica case
-	if (can_start_rebuild_return_success(zinfo, req->volname)) {
+	// This might be single replica case
+	if (start_rebuild_opcode_on_healthy_replica(zinfo, req->volname)) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
-		LOG_INFO("Rebuilding success for %s due to single replica "
-		    "%s", zinfo->name);
+		LOG_INFO("Rebuilding success for volume %s due to single "
+		    "replica ", zinfo->name);
 		uzfs_zinfo_drop_refcnt(zinfo);
 		rc = reply_nodata(conn, ZVOL_OP_STATUS_OK, hdrp);
 		goto end;
