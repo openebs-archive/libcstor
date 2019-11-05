@@ -1282,7 +1282,7 @@ uzfs_zinfo_rebuild_from_clone(zvol_info_t *zinfo)
  * This function returns TRUE if success can be sent to target
  */
 static boolean_t
-start_rebuild_opcode_on_healthy_replica(zvol_info_t *zinfo, char *volname)
+is_start_rebuild_opcode_on_healthy_replica(zvol_info_t *zinfo, char *volname)
 {
 	zvol_status_t status = uzfs_zinfo_get_status(zinfo);
 	zvol_rebuild_status_t rstatus = uzfs_zvol_get_rebuild_status(
@@ -1341,7 +1341,7 @@ handle_start_rebuild_req(uzfs_mgmt_conn_t *conn, zvol_io_hdr_t *hdrp,
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 
 	// This might be single replica case
-	if (start_rebuild_opcode_on_healthy_replica(zinfo, req->volname)) {
+	if (is_start_rebuild_opcode_on_healthy_replica(zinfo, req->volname)) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		LOG_INFO("Rebuilding success for volume %s due to single "
 		    "replica ", zinfo->name);
