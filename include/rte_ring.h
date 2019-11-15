@@ -97,9 +97,16 @@ extern "C" {
 #include <errno.h>
 #include <rte_common.h>
 #include <rte_memory.h>
-#include <rte_pause.h>
-#include <rte_atomic_generic.h>
-#include <rte_atomic.h>
+#include <generic/rte_atomic.h>
+
+#ifdef __x86_64__
+#include <arch/x86/rte_pause.h>
+#include <arch/x86/rte_atomic.h>
+#endif
+#ifdef __aarch64__
+#include <arch/arm/rte_pause.h>
+#include <arch/arm/rte_atomic.h>
+#endif
 
 #define RTE_TAILQ_RING_NAME "RTE_RING"
 
