@@ -99,11 +99,10 @@ extern "C" {
 #include <rte_memory.h>
 #include <generic/rte_atomic.h>
 
-#ifdef __x86_64__
+#if defined(__x86_64__)
 #include <arch/x86/rte_pause.h>
 #include <arch/x86/rte_atomic.h>
-#endif
-#ifdef __aarch64__
+#elif defined(__aarch64__)
 #include <arch/arm/rte_pause.h>
 #include <arch/arm/rte_atomic.h>
 #endif
