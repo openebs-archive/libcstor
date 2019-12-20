@@ -78,7 +78,11 @@ zrepl_log(enum zrepl_log_level lvl, const char *fmt, ...)
 	va_start(args, fmt);
 	vsnprintf(line + off, sizeof (line) - off, fmt, args);
 	va_end(args);
-	fprintf(stderr, "%s\n", line);
+	if (lvl == LOG_LEVEL_ERR) {
+		fprintf(stderr, "%s\n", line);
+	} else {
+		fprintf(stdout, "%s\n", line);
+	}
 }
 
 int
