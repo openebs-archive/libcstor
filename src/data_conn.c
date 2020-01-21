@@ -318,6 +318,8 @@ uzfs_zvol_worker(void *arg)
 	rebuild_cmd_req = hdr->flags & ZVOL_OP_FLAG_REBUILD;
 	read_metadata = hdr->flags & ZVOL_OP_FLAG_READ_METADATA;
 
+	atomic_inc_64(&zinfo->inflight_io_cnt);
+
 	if (!zinfo->is_io_ack_sender_created) {
 		if (!(rebuild_cmd_req && (hdr->opcode == ZVOL_OPCODE_WRITE)))
 			zio_cmd_free(&zio_cmd);
@@ -336,8 +338,6 @@ uzfs_zvol_worker(void *arg)
 			zio_cmd_free(&zio_cmd);
 		goto drop_refcount;
 	}
-
-	atomic_inc_64(&zinfo->inflight_io_cnt);
 
 	/*
 	 * If zvol hasn't passed rebuild phase or if read
