@@ -110,6 +110,7 @@ public:
 
 	void create();
 	void import();
+	void pExport();
 	void createZvol(std::string name, std::string arg = "");
 	void destroyZvol(std::string name);
 	std::string getZvolName(std::string name);

@@ -224,7 +224,8 @@ scan_conn_list(void)
 		conn_tmp = SLIST_NEXT(conn, conn_next);
 		/* we need to create new connection */
 		if (conn->conn_refcount > 0 && conn->conn_fd < 0 &&
-		    time(NULL) - conn->conn_last_connect >= RECONNECT_DELAY) {
+		    time(NULL) - conn->conn_last_connect >= RECONNECT_DELAY &&
+		    !conn->disabled) {
 			conn->conn_fd = connect_to_tgt(conn);
 			if (conn->conn_fd >= 0) {
 				conn->conn_state = CS_CONNECT;
@@ -305,10 +306,16 @@ zinfo_create_cb(zvol_info_t *zinfo, nvlist_t *create_props)
 			/* we already have conn for this target */
 			conn->conn_refcount++;
 			zinfo->mgmt_conn = conn;
+			if (IS_ZVOL_OFFLINE(zv)) {
+				conn->disabled = TRUE;
+			}
 			mutex_exit(&conn_list_mtx);
 			kmem_free(new_mgmt_conn, sizeof (*new_mgmt_conn));
 			return;
 		}
+	}
+	if (IS_ZVOL_OFFLINE(zv)) {
+		new_mgmt_conn->disabled = TRUE;
 	}
 
 	new_mgmt_conn->conn_fd = -1;
@@ -1011,7 +1018,8 @@ uzfs_zvol_execute_async_command(void *arg)
 	case ZVOL_OPCODE_SNAP_CREATE:
 		snap = async_task->payload;
 
-		if (zinfo->disallow_snapshot) {
+		if (zinfo->disallow_snapshot ||
+		    IS_ZVOL_OFFLINE(zinfo->main_zv)) {
 			LOG_ERR("Failed to create snapshot %s"
 			    " because snapshot is not allowed", snap);
 			async_task->status = ZVOL_OP_STATUS_FAILED;
@@ -1454,7 +1462,8 @@ handle_prepare_snap_req(zvol_info_t *zinfo, uzfs_mgmt_conn_t *conn,
     zvol_io_hdr_t *hdrp, char *zvol_name, char *snap)
 {
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
-	if (zinfo->disallow_snapshot || zinfo->is_snap_inprogress) {
+	if (zinfo->disallow_snapshot || zinfo->is_snap_inprogress ||
+	    IS_ZVOL_OFFLINE(zinfo->main_zv)) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		LOG_INFO("prep snapshot failed %s : %s snap %s",
 		    zinfo->disallow_snapshot ? "disallowed" : "snap inprogress",
@@ -1972,4 +1981,39 @@ exit:
 	 *	mutex_destroy(&async_tasks_mtx);
 	 */
 	exit(2);
+}
+
+int
+disable_zinfo_conn(char *zv_name)
+{
+	zvol_info_t *zinfo;
+	uzfs_mgmt_conn_t *conn;
+
+	zinfo = uzfs_zinfo_lookup(zv_name);
+	if (zinfo == NULL) {
+		return (EINVAL);
+	}
+
+	conn = zinfo->mgmt_conn;
+	conn->disabled = TRUE;
+	uzfs_zinfo_drop_refcnt(zinfo);
+	return (0);
+}
+
+	int
+enable_zinfo_conn(char *zv_name)
+{
+	zvol_info_t *zinfo;
+	uzfs_mgmt_conn_t *conn;
+
+	zinfo = uzfs_zinfo_lookup(zv_name);
+	if (zinfo == NULL) {
+		return (EINVAL);
+	}
+
+	conn = zinfo->mgmt_conn;
+	conn->disabled = FALSE;
+
+	uzfs_zinfo_drop_refcnt(zinfo);
+	return (0);
 }

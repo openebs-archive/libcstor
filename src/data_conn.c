@@ -242,6 +242,9 @@ uzfs_submit_writes(zvol_info_t *zinfo, zvol_io_cmd_t *zio_cmd)
 	}
 #endif
 
+	if (IS_ZVOL_OFFLINE(zinfo->main_zv))
+		return (-1);
+
 	while (remain > 0) {
 		if (remain < sizeof (*write_hdr))
 			return (-1);
@@ -267,6 +270,9 @@ uzfs_submit_writes(zvol_info_t *zinfo, zvol_io_cmd_t *zio_cmd)
 
 		/* IO to clone should be sent only when it is from app */
 		if (!is_rebuild && !ZVOL_IS_HEALTHY(zinfo->main_zv)) {
+			if (IS_ZVOL_OFFLINE(zinfo->clone_zv))
+				return (-1);
+
 			rc = uzfs_write_data(zinfo->clone_zv, datap,
 			    data_offset, write_hdr->len, &metadata,
 			    is_rebuild);
