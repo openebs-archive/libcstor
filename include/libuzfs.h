@@ -28,7 +28,7 @@ extern int kthread_nr;
 
 #define	PEND_CONNECTIONS 10
 
-#define	UZFS_SOCK "/tmp/uzfs.sock"
+#define	UZFS_SOCK "/var/run/uzfs.sock"
 #define	LOCK_FILE "/tmp/zrepl.lock"
 
 #define	SET_ERR(err) (errno = err, -1)
