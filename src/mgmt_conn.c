@@ -306,7 +306,7 @@ zinfo_create_cb(zvol_info_t *zinfo, nvlist_t *create_props)
 			/* we already have conn for this target */
 			conn->conn_refcount++;
 			zinfo->mgmt_conn = conn;
-			if (IS_ZVOL_OFFLINE(zv)) {
+			if (IS_ZVOL_READONLY(zv)) {
 				conn->disabled = TRUE;
 			}
 			mutex_exit(&conn_list_mtx);
@@ -314,7 +314,7 @@ zinfo_create_cb(zvol_info_t *zinfo, nvlist_t *create_props)
 			return;
 		}
 	}
-	if (IS_ZVOL_OFFLINE(zv)) {
+	if (IS_ZVOL_READONLY(zv)) {
 		new_mgmt_conn->disabled = TRUE;
 	}
 
@@ -1019,9 +1019,10 @@ uzfs_zvol_execute_async_command(void *arg)
 		snap = async_task->payload;
 
 		if (zinfo->disallow_snapshot ||
-		    IS_ZVOL_OFFLINE(zinfo->main_zv)) {
+		    IS_ZVOL_READONLY(zinfo->main_zv)) {
 			LOG_ERR("Failed to create snapshot %s"
-			    " because snapshot is not allowed", snap);
+			    " because snapshot is not allowed or"
+			    " volume is readonly", snap);
 			async_task->status = ZVOL_OP_STATUS_FAILED;
 			break;
 		}
@@ -1463,10 +1464,12 @@ handle_prepare_snap_req(zvol_info_t *zinfo, uzfs_mgmt_conn_t *conn,
 {
 	mutex_enter(&zinfo->main_zv->rebuild_mtx);
 	if (zinfo->disallow_snapshot || zinfo->is_snap_inprogress ||
-	    IS_ZVOL_OFFLINE(zinfo->main_zv)) {
+	    IS_ZVOL_READONLY(zinfo->main_zv)) {
 		mutex_exit(&zinfo->main_zv->rebuild_mtx);
 		LOG_INFO("prep snapshot failed %s : %s snap %s",
-		    zinfo->disallow_snapshot ? "disallowed" : "snap inprogress",
+		    zinfo->disallow_snapshot ? "disallowed" :
+		    (IS_ZVOL_READONLY(zinfo->main_zv) ? "zvol is readonly" :
+		    "snap inprogress"),
 		    zvol_name, snap);
 		return (reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp));
 	}
@@ -1983,37 +1986,20 @@ exit:
 	exit(2);
 }
 
-int
-disable_zinfo_conn(char *zv_name)
+void
+disable_zinfo_mgmt_conn(zvol_info_t *zinfo)
 {
-	zvol_info_t *zinfo;
 	uzfs_mgmt_conn_t *conn;
-
-	zinfo = uzfs_zinfo_lookup(zv_name);
-	if (zinfo == NULL) {
-		return (EINVAL);
-	}
 
 	conn = zinfo->mgmt_conn;
 	conn->disabled = TRUE;
-	uzfs_zinfo_drop_refcnt(zinfo);
-	return (0);
 }
 
-	int
-enable_zinfo_conn(char *zv_name)
+void
+enable_zinfo_mgmt_conn(zvol_info_t *zinfo)
 {
-	zvol_info_t *zinfo;
 	uzfs_mgmt_conn_t *conn;
-
-	zinfo = uzfs_zinfo_lookup(zv_name);
-	if (zinfo == NULL) {
-		return (EINVAL);
-	}
 
 	conn = zinfo->mgmt_conn;
 	conn->disabled = FALSE;
-
-	uzfs_zinfo_drop_refcnt(zinfo);
-	return (0);
 }

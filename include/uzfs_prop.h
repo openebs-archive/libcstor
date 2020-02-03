@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-int uzfs_zfs_set_prop(const char *name, zprop_source_t source, nvlist_t *list);
+int uzfs_zinfo_update_rdonly(const char *name, const char *val);
 
 #ifdef	__cplusplus
 }

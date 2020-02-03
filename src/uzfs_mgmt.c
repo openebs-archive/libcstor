@@ -494,6 +494,23 @@ is_internally_created_clone_volume(const char *ds_name)
 	    REBUILD_SNAPSHOT_CLONENAME));
 }
 
+static int
+update_zv_rdonly(zvol_state_t *zv, const char *val)
+{
+	int error = 0;
+
+	mutex_enter(&zv->conf_mtx);
+	if (strcmp(val, "on") == 0) {
+		zv->zv_flags |= ZVOL_RDONLY;
+	} else if (strcmp(val, "off") == 0) {
+		zv->zv_flags &= ~ZVOL_RDONLY;
+	} else {
+		error = SET_ERROR(EINVAL);
+	}
+	mutex_exit(&zv->conf_mtx);
+	return (error);
+}
+
 /*
  * update_zvol_property updates the zv values
  * according to given property 'nvprops'
@@ -539,17 +556,7 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 					zv->zvol_workers = (uint8_t)strtol(val,
 					    NULL, 10);
 				} else if (prop == ZFS_PROP_ZVOL_READONLY) {
-					mutex_enter(&zv->conf_mtx);
-					if (strcmp(val, "on") == 0) {
-						zv->zv_flags |= ZVOL_RDONLY;
-						disable_zinfo_conn(zv->zv_name);
-					} else if (strcmp(val, "off") == 0) {
-						zv->zv_flags &= ~ZVOL_RDONLY;
-						enable_zinfo_conn(zv->zv_name);
-					} else {
-						error = SET_ERROR(EINVAL);
-					}
-					mutex_exit(&zv->conf_mtx);
+					error = update_zv_rdonly(zv, val);
 				}
 				break;
 		}

@@ -1,14 +1,16 @@
 #include <zrepl_mgmt.h>
 #include <uzfs_mgmt.h>
+#include <mgmt_conn.h>
 
 /*
  * This file defines function to set property of uzfs zvol
  */
 int
-uzfs_zfs_set_prop(const char *name, zprop_source_t source, nvlist_t *list)
+uzfs_zinfo_update_rdonly(const char *name, const char *val)
 {
 	zvol_info_t *zinfo;
 	int error;
+	nvlist_t *props;
 
 	/* fetch zinfo for given volume */
 	zinfo = uzfs_zinfo_lookup(name);
@@ -17,25 +19,25 @@ uzfs_zfs_set_prop(const char *name, zprop_source_t source, nvlist_t *list)
 		return (EINVAL);
 	}
 
-	(void) pthread_mutex_lock(&zinfo->zinfo_mutex);
-	error = update_zvol_property(zinfo->main_zv, list);
+	nvlist_alloc(&props, NV_UNIQUE_NAME, 0);
+	nvlist_add_string(props,
+	    zfs_prop_to_name(ZFS_PROP_ZVOL_READONLY), val);
+
+	error = update_zvol_property(zinfo->main_zv, props);
 	if (error) {
 		LOG_ERR("Property updation failed(%d)", error);
 		goto end;
 	}
 
-	if (error == 0 && zinfo->clone_zv != NULL) {
-		error = update_zvol_property(zinfo->clone_zv, list);
-		if (error) {
-			LOG_ERR("Updation property failed(%d)", error);
-			goto end;
-		}
-
+	if (IS_ZVOL_READONLY(zinfo->main_zv)) {
+		disable_zinfo_mgmt_conn(zinfo);
+	} else {
+		enable_zinfo_mgmt_conn(zinfo);
 	}
 
 end:
-	(void) pthread_mutex_unlock(&zinfo->zinfo_mutex);
 	/* dropping refcount for uzfs_zinfo_lookup */
 	uzfs_zinfo_drop_refcnt(zinfo);
+	nvlist_free(props);
 	return (error);
 }
