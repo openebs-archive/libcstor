@@ -26,13 +26,12 @@
 #include <uzfs_io.h>
 #include <uzfs_zap.h>
 #include <uzfs_rebuilding.h>
+#include <mgmt_conn.h>
 
 #include <libnvpair.h>
 static int uzfs_fd_rand = -1;
 kmutex_t zvol_list_mutex;
 char *uzfs_spa_tag = "UZFS_SPA_TAG";
-
-int update_zvol_property(zvol_state_t *, nvlist_t *);
 
 static nvlist_t *
 make_root(char *path, int ashift, int log)
@@ -495,6 +494,23 @@ is_internally_created_clone_volume(const char *ds_name)
 	    REBUILD_SNAPSHOT_CLONENAME));
 }
 
+static int
+update_zv_rdonly(zvol_state_t *zv, const char *val)
+{
+	int error = 0;
+
+	mutex_enter(&zv->conf_mtx);
+	if (strcmp(val, "on") == 0) {
+		zv->zv_flags |= ZVOL_RDONLY;
+	} else if (strcmp(val, "off") == 0) {
+		zv->zv_flags &= ~ZVOL_RDONLY;
+	} else {
+		error = SET_ERROR(EINVAL);
+	}
+	mutex_exit(&zv->conf_mtx);
+	return (error);
+}
+
 /*
  * update_zvol_property updates the zv values
  * according to given property 'nvprops'
@@ -512,10 +528,10 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 	while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
 		prop = zfs_name_to_prop(nvpair_name(elem));
 		val = NULL;
-
 		switch (prop) {
 			case ZFS_PROP_TARGETIP:
 			case ZFS_PROP_WORKERS:
+			case ZFS_PROP_ZVOL_READONLY:
 				if (nvpair_type(elem) == DATA_TYPE_NVLIST) {
 					error = nvpair_value_nvlist(elem, &nv);
 					if (error == 0) {
@@ -539,6 +555,8 @@ update_zvol_property(zvol_state_t *zv, nvlist_t *nvprops)
 				} else if (prop == ZFS_PROP_WORKERS) {
 					zv->zvol_workers = (uint8_t)strtol(val,
 					    NULL, 10);
+				} else if (prop == ZFS_PROP_ZVOL_READONLY) {
+					error = update_zv_rdonly(zv, val);
 				}
 				break;
 		}

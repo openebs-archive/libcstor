@@ -62,6 +62,11 @@ typedef struct uzfs_mgmt_conn {
 	int		conn_procn;	// bytes already read/written
 	zvol_io_hdr_t	*conn_hdr;	// header of currently processed cmd
 	time_t		conn_last_connect;  // time of last attempted connect()
+
+	/*
+	 * connection is disabled since zvol is readonly mode
+	 */
+	boolean_t disabled;
 } uzfs_mgmt_conn_t;
 
 /*
@@ -107,6 +112,9 @@ int uzfs_get_snap_zv_ionum(zvol_info_t *, uint64_t, zvol_state_t **);
 
 int uzfs_zvol_get_snap_dataset_with_io(zvol_info_t *zinfo,
     char *snapname, uint64_t *snapshot_io_num, zvol_state_t **snap_zv);
+
+void disable_zinfo_mgmt_conn(zvol_info_t *zinfo);
+void enable_zinfo_mgmt_conn(zvol_info_t *zinfo);
 
 #ifdef __cplusplus
 }

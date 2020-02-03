@@ -46,6 +46,7 @@ int get_snapshot_zv(zvol_state_t *zv, const char *snap_name,
 extern int destroy_snapshot_zv(zvol_state_t *zv, char *snap_name);
 
 int uzfs_pool_create(const char *name, char *path, spa_t **spa);
+int update_zvol_property(zvol_state_t *, nvlist_t *);
 #ifdef __cplusplus
 }
 #endif

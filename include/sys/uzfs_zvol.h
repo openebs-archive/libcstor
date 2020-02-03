@@ -92,9 +92,17 @@ struct zvol_state {
 	kmutex_t conf_mtx;
 	zvol_rebuild_info_t rebuild_info;
 	uint8_t zvol_workers;			/* zvol workers count */
+
+	uint32_t zv_flags;			/* zvol flags */
 };
 
+/* zv flag definition */
+#define	ZVOL_RDONLY	0x1
+
 #define	ZVOL_VOLUME_SIZE(zv)	(zv->zv_volsize)
+
+#define	IS_ZVOL_READONLY(zv)		((zv->zv_flags & ZVOL_RDONLY))
+
 typedef struct zvol_state zvol_state_t;
 
 #define	UZFS_IO_TX_ASSIGN_FAIL	1

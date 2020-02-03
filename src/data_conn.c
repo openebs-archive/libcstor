@@ -242,6 +242,9 @@ uzfs_submit_writes(zvol_info_t *zinfo, zvol_io_cmd_t *zio_cmd)
 	}
 #endif
 
+	if (IS_ZVOL_READONLY(zinfo->main_zv))
+		return (-1);
+
 	while (remain > 0) {
 		if (remain < sizeof (*write_hdr))
 			return (-1);
