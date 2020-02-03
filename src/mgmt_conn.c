@@ -1021,8 +1021,11 @@ uzfs_zvol_execute_async_command(void *arg)
 		if (zinfo->disallow_snapshot ||
 		    IS_ZVOL_READONLY(zinfo->main_zv)) {
 			LOG_ERR("Failed to create snapshot %s"
-			    " because snapshot is not allowed or"
-			    " volume is readonly", snap);
+			    " because %s",
+			    snap, (zinfo->disallow_snapshot ?
+			    "snapshot is not allowed" :
+			    (IS_ZVOL_READONLY(zinfo->main_zv) ?
+			    "Volume is readonly" : "Internal error")));
 			async_task->status = ZVOL_OP_STATUS_FAILED;
 			break;
 		}
