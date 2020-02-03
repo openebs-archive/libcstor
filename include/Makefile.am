@@ -14,7 +14,8 @@ HEADER_H = \
 	$(top_srcdir)/include/uzfs_test.h	\
 	$(top_srcdir)/include/uzfs_zap.h	\
 	$(top_srcdir)/include/zrepl_mgmt.h	\
-	$(top_srcdir)/include/zrepl_prot.h
+	$(top_srcdir)/include/zrepl_prot.h	\
+	$(top_srcdir)/include/uzfs_prop.h
 
 EXTRA_DIST = $(HEADER_H)
 
