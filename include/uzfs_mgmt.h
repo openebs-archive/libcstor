@@ -47,6 +47,7 @@ extern int destroy_snapshot_zv(zvol_state_t *zv, char *snap_name);
 
 int uzfs_pool_create(const char *name, char *path, spa_t **spa);
 int update_zvol_property(zvol_state_t *, nvlist_t *);
+int is_internally_created_clone_volume(const char *ds_name);
 #ifdef __cplusplus
 }
 #endif

@@ -101,7 +101,8 @@ struct zvol_state {
 
 #define	ZVOL_VOLUME_SIZE(zv)	(zv->zv_volsize)
 
-#define	IS_ZVOL_READONLY(zv)		((zv->zv_flags & ZVOL_RDONLY))
+#define	IS_ZVOL_READONLY(zv)	\
+	((zv->zv_flags & ZVOL_RDONLY) || (zv->zv_spa->readonly))
 
 typedef struct zvol_state zvol_state_t;
 

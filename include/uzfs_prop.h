@@ -9,6 +9,7 @@ extern "C" {
 
 int uzfs_zinfo_update_rdonly(const char *name, const char *val);
 
+int uzfs_zpool_rdonly_cb(const char *name, void *arg);
 #ifdef	__cplusplus
 }
 #endif
