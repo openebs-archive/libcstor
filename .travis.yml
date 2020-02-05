@@ -23,6 +23,8 @@ before_install:
     - sudo unlink /usr/bin/gcc && sudo ln -s /usr/bin/gcc-6 /usr/bin/gcc
     - sudo unlink /usr/bin/g++ && sudo ln -s /usr/bin/g++-6 /usr/bin/g++
 install:
+    # zrepl will make use of /var/tmp/sock directory to create a sock file.
+    - mkdir -p /var/tmp/sock
     - pushd .
     - cd /usr/src/gtest
     - sudo cmake CMakeLists.txt
