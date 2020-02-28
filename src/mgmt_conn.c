@@ -1581,7 +1581,9 @@ process_message(uzfs_mgmt_conn_t *conn)
 			LOG_ERR("Invalid snapshot name: %s", zvol_name);
 			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
 			break;
-		} else if (snap != NULL) {
+		}
+
+		if (snap != NULL) {
 			*snap++ = '\0';
 		}
 
