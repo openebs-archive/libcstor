@@ -731,8 +731,8 @@ uzfs_zvol_get_json_snap_list_ref(zvol_info_t *zinfo, int *err)
 
 	*err = 0;
 	if (zinfo->snap_list == NULL) {
-		jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, B_FALSE,
-		    &error);
+		jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, NULL,
+		    B_FALSE, &error);
 
 		if (error == ENOENT)
 			error = 0;
@@ -828,8 +828,8 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
  * Returns ENOENT on success.
  */
 struct json_object *
-uzfs_zvol_fetch_json_snapshot_list(zvol_info_t *zinfo, boolean_t props,
-    int *err)
+uzfs_zvol_fetch_json_snapshot_list(zvol_info_t *zinfo, char *snap,
+    boolean_t props, int *err)
 {
 	char *snapname;
 	boolean_t case_conflict, prop_error;
@@ -869,6 +869,11 @@ uzfs_zvol_fetch_json_snapshot_list(zvol_info_t *zinfo, boolean_t props,
 
 		printf("snapname: %s\n", snapname);
 		if (internal_snapshot(snapname)) {
+			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
+			continue;
+		}
+
+		if (snap && strcmp(snap, snapname)) {
 			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 			continue;
 		}
@@ -919,7 +924,7 @@ out:
 }
 
 static int
-uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
+uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
     size_t *buflen)
 {
 	int error = 0;
@@ -928,7 +933,8 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
 	uint64_t total_len;
 	const char *json_string;
 
-	jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, B_TRUE, &error);
+	jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, snap, B_TRUE,
+	    &error);
 
 	jobj = json_object_new_object();
 	json_object_object_add(jobj, "snapshot", jarray);
@@ -1254,7 +1260,9 @@ ret_error:
 		}
 		break;
 	case ZVOL_OPCODE_SNAP_LIST:
-		rc = uzfs_zvol_fetch_snapshot_list(zinfo, &async_task->response,
+		snap = async_task->payload;
+		rc = uzfs_zvol_fetch_snapshot_list(zinfo,
+		    snap, &async_task->response,
 		    (size_t *)&async_task->response_length);
 		if (rc != 0) {
 			LOG_ERR("Failed to fetch snapshot list for zvol %s\n",
@@ -1709,17 +1717,17 @@ process_message(uzfs_mgmt_conn_t *conn)
 		}
 		strlcpy(zvol_name, payload, payload_size);
 		zvol_name[payload_size] = '\0';
-		if (hdrp->opcode != ZVOL_OPCODE_SNAP_LIST) {
-			snap = strchr(zvol_name, '@');
-			if (snap == NULL) {
-				LOG_ERR("Invalid snapshot name: %s",
-				    zvol_name);
-				rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED,
-				    hdrp);
-				break;
-			}
+		snap = strchr(zvol_name, '@');
+		if (snap == NULL && hdrp->opcode != ZVOL_OPCODE_SNAP_LIST) {
+			LOG_ERR("Invalid snapshot name: %s", zvol_name);
+			rc = reply_nodata(conn, ZVOL_OP_STATUS_FAILED, hdrp);
+			break;
+		}
+
+		if (snap != NULL) {
 			*snap++ = '\0';
 		}
+
 		/* ref will be released when async command has finished */
 		if ((zinfo = uzfs_zinfo_lookup(zvol_name)) == NULL) {
 			LOGERRCONN(conn, "Unknown zvol: %s", zvol_name);
@@ -1735,8 +1743,8 @@ process_message(uzfs_mgmt_conn_t *conn)
 		}
 		if (hdrp->opcode == ZVOL_OPCODE_SNAP_LIST) {
 			LOGCONN(conn, "Snaplist command for %s", zinfo->name);
-			rc = uzfs_zvol_dispatch_command(conn, hdrp, NULL, 0,
-			    zinfo);
+			rc = uzfs_zvol_dispatch_command(conn, hdrp, snap,
+			    (snap == NULL) ? 0 : strlen(snap) + 1, zinfo);
 			break;
 		}
 		if (hdrp->opcode == ZVOL_OPCODE_SNAP_PREPARE) {
