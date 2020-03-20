@@ -717,9 +717,119 @@ internal_snapshot(char *snap)
 	return (B_FALSE);
 }
 
-static int
-uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
-    size_t *buflen)
+/*
+ * This fn returns reference to zinfo's snap_list json_object.
+ * If its NULL, it creates one and returns it
+ * Its the responsibility of caller to release the reference.
+ */
+struct json_object *
+uzfs_zvol_get_json_snap_list_ref(zvol_info_t *zinfo, int *err)
+{
+	boolean_t freeit = B_FALSE;
+	struct json_object *jarray;
+	int error;
+
+	*err = 0;
+	if (zinfo->snap_list == NULL) {
+		jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, B_FALSE,
+		    &error);
+
+		if (error == ENOENT)
+			error = 0;
+
+		if (error) {
+			json_object_put(jarray);
+			*err = error;
+			return (NULL);
+		}
+
+		pthread_mutex_lock(&zinfo->snap_list_mutex);
+		if (zinfo->snap_list == NULL)
+			zinfo->snap_list = jarray;
+		else
+			freeit = B_TRUE;
+		pthread_mutex_unlock(&zinfo->snap_list_mutex);
+
+		if (freeit == B_TRUE)
+			json_object_put(jarray);
+	}
+	jarray = NULL;
+	pthread_mutex_lock(&zinfo->snap_list_mutex);
+	if (zinfo->snap_list == NULL)
+		*err = EAGAIN;
+	else
+		jarray = json_object_get(zinfo->snap_list);
+	pthread_mutex_unlock(&zinfo->snap_list_mutex);
+
+	return (jarray);
+}
+
+/*
+ * This fn adds snapname to zinfo's snap_list in json format.
+ * If errors, sets snap_list to NULL as add failed
+ * This fn is currently called only if snapshot is created through
+ * istgt, but, not through CLI
+ */
+int
+uzfs_zvol_add_json_snap_list(zvol_info_t *zinfo, char *snapname)
+{
+	int ret = 0;
+	struct json_object *jarray, *jobj;
+
+	jarray = uzfs_zvol_get_json_snap_list_ref(zinfo, &ret);
+	if (ret == 0) {
+		jobj = json_object_new_object();
+		json_object_object_add(jobj, "name",
+		    json_object_new_string(snapname));
+		ret = json_object_array_add(jarray, jobj);
+		json_object_put(jarray);
+	}
+	if (ret != 0) {
+		pthread_mutex_lock(&zinfo->snap_list_mutex);
+		if (zinfo->snap_list != NULL)
+			json_object_put(zinfo->snap_list);
+		zinfo->snap_list = NULL;
+		pthread_mutex_unlock(&zinfo->snap_list_mutex);
+	}
+	return (0);
+}
+
+/*
+ * This fn gets the list of snapshots in json format, and adds it to nvl.
+ * `json_object_to_json_string_ext` is a single threaded fn, i.e., interally,
+ * this library uses a single buffer
+ * https://html.developreference.com/article/23032444/, and thus,
+ * lock has been added while using the jarray which is ref of snap_list jobj.
+ */
+int
+uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
+{
+	struct json_object *jarray;
+	int error = 0;
+	const char *json_string;
+
+	jarray = uzfs_zvol_get_json_snap_list_ref(zinfo, &error);
+	if (error != 0)
+		return (error);
+
+	pthread_mutex_lock(&zinfo->snap_list_mutex);
+	json_string = json_object_to_json_string_ext(jarray,
+	    JSON_C_TO_STRING_PLAIN);
+	fnvlist_add_string(nvl, "snaplist", json_string);
+	pthread_mutex_unlock(&zinfo->snap_list_mutex);
+	json_object_put(jarray);
+
+	return (0);
+}
+
+/*
+ * This fn returns list of snapshots by walking through datasets in json
+ * format. `props` being TRUE will fetch the properties also.
+ * Returns ENOENT on success.
+ */
+struct json_object *
+uzfs_zvol_fetch_json_snapshot_list(zvol_info_t *zinfo, boolean_t props,
+    int *err)
 {
 	char *snapname;
 	boolean_t case_conflict, prop_error;
@@ -727,18 +837,24 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
 	int error = 0;
 	zvol_state_t *zv = (zvol_state_t *)zinfo->main_zv;
 	objset_t *os = zv->zv_objset;
-	struct zvol_snapshot_list *snap_list;
 	dsl_dataset_t *ds;
-	dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
+	dsl_pool_t *dp;
 	objset_t *snap_os;
 	nvlist_t *nv;
-	struct json_object *jobj, *jarray, *jprop;
-	const char *json_string;
-	uint64_t total_len;
+	struct json_object *jobj, *jarray = NULL, *jprop;
 	char err_msg[128];
 
-	snapname = kmem_zalloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
 	jarray = json_object_new_array();
+	snapname = kmem_zalloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
+
+	if ((os == NULL) || (os->os_dsl_dataset == NULL) ||
+	    (os->os_dsl_dataset->ds_dir == NULL) ||
+	    (os->os_dsl_dataset->ds_dir->dd_pool == NULL)) {
+		error = EAGAIN;
+		goto out;
+	}
+
+	dp = os->os_dsl_dataset->ds_dir->dd_pool;
 
 	while (error == 0) {
 		prop_error = TRUE;
@@ -751,6 +867,7 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
 			goto out;
 		}
 
+		printf("snapname: %s\n", snapname);
 		if (internal_snapshot(snapname)) {
 			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 			continue;
@@ -776,26 +893,45 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
 		json_object_object_add(jobj, "name",
 		    json_object_new_string(snapname));
 
-		jprop = json_object_new_object();
-		if (error == 0 && !prop_error) {
-			uzfs_append_snapshot_properties(nv, jprop, NULL);
-			nvlist_free(nv);
-		} else {
-			snprintf(err_msg, sizeof (err_msg),
-			    "Failed to fetch snapshot details.. err(%d)",
-			    error);
-			json_object_object_add(jprop, "error",
-			    json_object_new_string(err_msg));
+		if (props) {
+			jprop = json_object_new_object();
+			if (error == 0 && !prop_error) {
+				uzfs_append_snapshot_properties(nv, jprop,
+				    NULL);
+				nvlist_free(nv);
+			} else {
+				snprintf(err_msg, sizeof (err_msg),
+				    "Failed to fetch snap %s details.. err(%d)",
+				    snapname, error);
+				json_object_object_add(jprop, "error",
+				    json_object_new_string(err_msg));
+			}
+			json_object_object_add(jobj, "properties", jprop);
 		}
-		json_object_object_add(jobj, "properties", jprop);
 		json_object_array_add(jarray, jobj);
 	}
 
 out:
+	kmem_free(snapname, ZFS_MAX_DATASET_NAME_LEN);
+	*err = error;
+
+	return (jarray);
+}
+
+static int
+uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, void **buf,
+    size_t *buflen)
+{
+	int error = 0;
+	struct zvol_snapshot_list *snap_list;
+	struct json_object *jobj, *jarray;
+	uint64_t total_len;
+	const char *json_string;
+
+	jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, B_TRUE, &error);
+
 	jobj = json_object_new_object();
 	json_object_object_add(jobj, "snapshot", jarray);
-
-	kmem_free(snapname, ZFS_MAX_DATASET_NAME_LEN);
 
 	json_string = json_object_to_json_string_ext(jobj,
 	    JSON_C_TO_STRING_PLAIN);
@@ -889,6 +1025,10 @@ uzfs_zvol_create_snapshot_update_zap(zvol_info_t *zinfo,
 	    snapshot_io_num - 1);
 
 	ret = dmu_objset_snapshot_one(zinfo->name, snapname);
+
+	if (ret == 0)
+		uzfs_zvol_add_json_snap_list(zinfo, snapname);
+
 	return (ret);
 }
 
