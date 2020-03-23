@@ -732,7 +732,7 @@ uzfs_zvol_get_json_snap_list_ref(zvol_info_t *zinfo, int *err)
 	*err = 0;
 	if (zinfo->snap_list == NULL) {
 		jarray = uzfs_zvol_fetch_json_snapshot_list(zinfo, NULL,
-		    B_FALSE, &error);
+		    B_TRUE, &error);
 
 		if (error == ENOENT)
 			error = 0;
@@ -771,17 +771,38 @@ uzfs_zvol_get_json_snap_list_ref(zvol_info_t *zinfo, int *err)
  * istgt, but, not through CLI
  */
 int
-uzfs_zvol_add_json_snap_list(zvol_info_t *zinfo, char *snapname)
+uzfs_zvol_update_json_snap_list(zvol_info_t *zinfo, char *snapname,
+    boolean_t add)
 {
-	int ret = 0;
-	struct json_object *jarray, *jobj;
+	int ret = 0, error = 0, jarrayLen = 0, i;
+	struct json_object *jarray, *jobj, *jname;
+	struct json_object *snapjarray, *snapjobj;
 
 	jarray = uzfs_zvol_get_json_snap_list_ref(zinfo, &ret);
 	if (ret == 0) {
-		jobj = json_object_new_object();
-		json_object_object_add(jobj, "name",
-		    json_object_new_string(snapname));
-		ret = json_object_array_add(jarray, jobj);
+		if (add) {
+			snapjarray = uzfs_zvol_fetch_json_snapshot_list(zinfo,
+			    snapname, B_TRUE, &ret);
+			if (ret == ENOENT)
+				ret = 0;
+			if (ret == 0) {
+				snapjobj = json_object_array_get_idx(snapjarray,
+				    0);
+				snapjobj = json_object_get(snapjobj);
+				ret = json_object_array_add(jarray, snapjobj);
+			}
+			json_object_put(snapjarray);
+		} else {
+			jarrayLen = json_object_array_length(jarray);
+			for (i = 0; i < jarrayLen; i++) {
+				jobj = json_object_array_get_idx(jarray, i);
+				json_object_object_get_ex(jobj, "name", &jname);
+				if (strcmp(json_object_get_string(jname), snapname) == 0) {
+					json_object_array_put_idx(jarray, i, NULL);
+					break;
+				}
+			}
+		}
 		json_object_put(jarray);
 	}
 	if (ret != 0) {
@@ -800,11 +821,13 @@ uzfs_zvol_add_json_snap_list(zvol_info_t *zinfo, char *snapname)
  * this library uses a single buffer
  * https://html.developreference.com/article/23032444/, and thus,
  * lock has been added while using the jarray which is ref of snap_list jobj.
+ *
+ * Caller need to take refcount on zinfo so that snap_list is safe to use.
  */
 int
 uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 {
-	struct json_object *jarray;
+	struct json_object *jarray, *jobj;
 	int error = 0;
 	const char *json_string;
 
@@ -812,12 +835,16 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 	if (error != 0)
 		return (error);
 
-	pthread_mutex_lock(&zinfo->snap_list_mutex);
-	json_string = json_object_to_json_string_ext(jarray,
+	jobj = json_object_new_object();
+	json_object_object_add(jobj, "name",
+	    json_object_new_string(zinfo->name));
+	json_object_object_add(jobj, "snaplist", jarray);
+
+	json_string = json_object_to_json_string_ext(jobj,
 	    JSON_C_TO_STRING_PLAIN);
-	fnvlist_add_string(nvl, "snaplist", json_string);
-	pthread_mutex_unlock(&zinfo->snap_list_mutex);
-	json_object_put(jarray);
+	fnvlist_add_string(nvl, "listsnap", json_string);
+
+	json_object_put(jobj);
 
 	return (0);
 }
@@ -826,6 +853,7 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
  * This fn returns list of snapshots by walking through datasets in json
  * format. `props` being TRUE will fetch the properties also.
  * Returns ENOENT on success.
+ * This will return EAGAIN if the replica is NOT connected to target.
  */
 struct json_object *
 uzfs_zvol_fetch_json_snapshot_list(zvol_info_t *zinfo, char *snap,
@@ -1033,7 +1061,7 @@ uzfs_zvol_create_snapshot_update_zap(zvol_info_t *zinfo,
 	ret = dmu_objset_snapshot_one(zinfo->name, snapname);
 
 	if (ret == 0)
-		uzfs_zvol_add_json_snap_list(zinfo, snapname);
+		uzfs_zvol_update_json_snap_list(zinfo, snapname, B_TRUE);
 
 	return (ret);
 }
@@ -1204,6 +1232,7 @@ uzfs_zvol_execute_async_command(void *arg)
 		snap = async_task->payload;
 		dataset = kmem_asprintf("%s@%s", zinfo->name, snap);
 		rc = dsl_destroy_snapshot(dataset, B_FALSE);
+		uzfs_zvol_update_json_snap_list(zinfo, snap, B_FALSE);
 		strfree(dataset);
 		if (rc != 0) {
 			LOG_ERR("Failed to destroy %s@%s: %d",
