@@ -323,7 +323,7 @@ uzfs_zinfo_init_mutex(zvol_info_t *zinfo)
 	(void) pthread_mutex_init(&zinfo->zinfo_mutex, NULL);
 	(void) pthread_cond_init(&zinfo->io_ack_cond, NULL);
 	(void) pthread_mutex_init(&zinfo->zinfo_ionum_mutex, NULL);
-	(void) pthread_mutex_init(&zinfo->snap_list_mutex, NULL);
+	(void) pthread_mutex_init(&zinfo->snap_map_mutex, NULL);
 }
 
 static void
@@ -333,7 +333,7 @@ uzfs_zinfo_destroy_mutex(zvol_info_t *zinfo)
 	(void) pthread_mutex_destroy(&zinfo->zinfo_mutex);
 	(void) pthread_cond_destroy(&zinfo->io_ack_cond);
 	(void) pthread_mutex_destroy(&zinfo->zinfo_ionum_mutex);
-	(void) pthread_mutex_destroy(&zinfo->snap_list_mutex);
+	(void) pthread_mutex_destroy(&zinfo->snap_map_mutex);
 }
 
 int
@@ -444,8 +444,8 @@ uzfs_zinfo_free(zvol_info_t *zinfo)
 	(void) uzfs_zinfo_destroy_mutex(zinfo);
 	ASSERT(STAILQ_EMPTY(&zinfo->complete_queue));
 
-	if (zinfo->snap_list)
-		json_object_put(zinfo->snap_list);
+	if (zinfo->snap_map)
+		json_object_put(zinfo->snap_map);
 
 	free(zinfo);
 	return (0);

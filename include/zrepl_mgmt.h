@@ -205,8 +205,8 @@ typedef struct zvol_info_s {
 	zfs_histogram_t uzfs_wio_histogram[ZFS_HISTOGRAM_IO_SIZE /
 	    ZFS_HISTOGRAM_IO_BLOCK + 1];
 
-	struct json_object *snap_list;
-	pthread_mutex_t	snap_list_mutex;
+	struct json_object *snap_map;
+	pthread_mutex_t	snap_map_mutex;
 } zvol_info_t;
 
 typedef struct zvol_rebuild_scanner_info_s {
