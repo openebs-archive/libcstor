@@ -717,7 +717,12 @@ internal_snapshot(char *snap)
 	return (B_FALSE);
 }
 
-struct json_object *
+/*
+ * This fn returns map of snapshots by walking through datasets in json
+ * format. Returns 0 on success.
+ * This will return EAGAIN if the replica is NOT connected to target.
+ */
+static struct json_object *
 uzfs_zvol_fetch_snapshot_jmap(zvol_info_t *zinfo, int *err)
 {
 	char *snapname;
@@ -729,7 +734,6 @@ uzfs_zvol_fetch_snapshot_jmap(zvol_info_t *zinfo, int *err)
 	dsl_dataset_t *ds;
 	dsl_pool_t *dp;
 	struct json_object *jmap = NULL;
-	char err_msg[128];
 
 	snapname = kmem_zalloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
 
@@ -753,7 +757,6 @@ uzfs_zvol_fetch_snapshot_jmap(zvol_info_t *zinfo, int *err)
 			break;
 		}
 
-		printf("snapname: %s\n", snapname);
 		if (internal_snapshot(snapname)) {
 			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 			continue;
@@ -820,25 +823,24 @@ uzfs_zvol_get_snap_jmap_ref(zvol_info_t *zinfo, int *err)
 }
 
 /*
- * This fn adds snapname to zinfo's snap_list in json format.
- * If errors, sets snap_list to NULL as add failed
- * This fn is currently called only if snapshot is created through
+ * This fn adds/deletes snapname to zinfo's snap_map in json format.
+ * If errors, sets snap_map to NULL as update failed
+ * This fn is currently called only if snapshot is created / deleted through
  * istgt, but, not through CLI
  */
 int
-uzfs_zvol_update_json_snap_list(zvol_info_t *zinfo, char *snapname,
+uzfs_zvol_update_snapshot_jmap(zvol_info_t *zinfo, char *snapname,
     boolean_t add)
 {
-	int ret = 0, error = 0, jarrayLen = 0, i;
+	int ret = 0;
 	struct json_object *jmap;
 
 	jmap = uzfs_zvol_get_snap_jmap_ref(zinfo, &ret);
 	if (ret == 0) {
-		if (add) {
+		if (add)
 			json_object_object_add(jmap, snapname, NULL);
-		} else {
+		else
 			json_object_object_del(jmap, snapname);
-		}
 		json_object_put(jmap);
 	} else {
 		pthread_mutex_lock(&zinfo->snap_map_mutex);
@@ -879,7 +881,6 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 	    JSON_C_TO_STRING_PLAIN);
 	fnvlist_add_string(nvl, "listsnap", json_string);
 
-	//json_object_put(jmap);
 	/* This will decrement refcount of jmap as well */
 	json_object_put(jobj);
 
@@ -887,9 +888,8 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 }
 
 /*
- * This fn returns list of snapshots by walking through datasets in json
- * format. `props` being TRUE will fetch the properties also.
- * Returns ENOENT on success.
+ * This fn returns list of snapshots by walking through datasets in string
+ * format. Returns 0 on success.
  * This will return EAGAIN if the replica is NOT connected to target.
  */
 static int
@@ -932,10 +932,9 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
 		    &case_conflict);
 		if (error) {
 			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
-			goto out;
+			break;
 		}
 
-		printf("snapname: %s\n", snapname);
 		if (internal_snapshot(snapname)) {
 			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 			continue;
@@ -968,8 +967,7 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
 
 		jprop = json_object_new_object();
 		if (error == 0 && !prop_error) {
-			uzfs_append_snapshot_properties(nv, jprop,
-			    NULL);
+			uzfs_append_snapshot_properties(nv, jprop, NULL);
 			nvlist_free(nv);
 		} else {
 			snprintf(err_msg, sizeof (err_msg),
@@ -1082,7 +1080,7 @@ uzfs_zvol_create_snapshot_update_zap(zvol_info_t *zinfo,
 	ret = dmu_objset_snapshot_one(zinfo->name, snapname);
 
 	if (ret == 0)
-		uzfs_zvol_update_json_snap_list(zinfo, snapname, B_TRUE);
+		uzfs_zvol_update_snapshot_jmap(zinfo, snapname, B_TRUE);
 
 	return (ret);
 }
@@ -1253,7 +1251,7 @@ uzfs_zvol_execute_async_command(void *arg)
 		snap = async_task->payload;
 		dataset = kmem_asprintf("%s@%s", zinfo->name, snap);
 		rc = dsl_destroy_snapshot(dataset, B_FALSE);
-		uzfs_zvol_update_json_snap_list(zinfo, snap, B_FALSE);
+		uzfs_zvol_update_snapshot_jmap(zinfo, snap, B_FALSE);
 		strfree(dataset);
 		if (rc != 0) {
 			LOG_ERR("Failed to destroy %s@%s: %d",

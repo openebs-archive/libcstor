@@ -113,8 +113,6 @@ int uzfs_get_snap_zv_ionum(zvol_info_t *, uint64_t, zvol_state_t **);
 int uzfs_zvol_get_snap_dataset_with_io(zvol_info_t *zinfo,
     char *snapname, uint64_t *snapshot_io_num, zvol_state_t **snap_zv);
 
-extern struct json_object *uzfs_zvol_fetch_json_snapshot_list(zvol_info_t *,
-    char *, boolean_t, int *);
 extern int uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *, nvlist_t *);
 void disable_zinfo_mgmt_conn(zvol_info_t *zinfo);
 void enable_zinfo_mgmt_conn(zvol_info_t *zinfo);
