@@ -861,6 +861,7 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 
 	if (error != 0) {
 		pthread_mutex_unlock(&zinfo->snap_map_mutex);
+		LOG_ERR("err %d for %s listsnap", error, zinfo->name);
 		return (error);
 	}
 
