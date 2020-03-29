@@ -767,7 +767,7 @@ uzfs_zvol_fetch_snapshot_jmap(zvol_info_t *zinfo, int *err)
 		json_object_object_add(jmap, snapname, NULL);
 	}
 
-	if ((error = ENOENT) || (error == 0)) {
+	if ((error == ENOENT) || (error == 0)) {
 		error = 0;
 	} else {
 		json_object_put(jmap);
@@ -786,28 +786,27 @@ out:
  * Its the responsibility of caller to release the reference.
  * Also, this fn need to be called with snap_map_mutex.
  */
-struct json_object *
-uzfs_zvol_get_snap_jmap_ref(zvol_info_t *zinfo, int *err)
+int
+uzfs_zvol_get_snap_jmap_ref(zvol_info_t *zinfo, struct json_object **jmapp)
 {
 	struct json_object *jmap;
-	int error;
+	int error = 0;
 
 	ASSERT(MUTEX_HELD(&zinfo->snap_map_mutex));
-	*err = 0;
+	*jampp = NULL;
 	if (zinfo->snap_map == NULL) {
 
 		jmap = uzfs_zvol_fetch_snapshot_jmap(zinfo, &error);
 
-		if (error) {
-			*err = error;
-			return (NULL);
-		}
+		if (error)
+			return (error);
 
 		zinfo->snap_map = jmap;
 	}
 	jmap = json_object_get(zinfo->snap_map);
 
-	return (jmap);
+	*jmapp = jmap;
+	return (0);
 }
 
 /*
@@ -824,7 +823,7 @@ uzfs_zvol_update_snapshot_jmap(zvol_info_t *zinfo, char *snapname,
 	struct json_object *jmap;
 
 	pthread_mutex_lock(&zinfo->snap_map_mutex);
-	jmap = uzfs_zvol_get_snap_jmap_ref(zinfo, &ret);
+	ret = uzfs_zvol_get_snap_jmap_ref(zinfo, &jmap);
 	if (ret == 0) {
 		if (add)
 			json_object_object_add(jmap, snapname, NULL);
@@ -857,7 +856,7 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 	const char *json_string;
 
 	pthread_mutex_lock(&zinfo->snap_map_mutex);
-	jmap = uzfs_zvol_get_snap_jmap_ref(zinfo, &error);
+	error = uzfs_zvol_get_snap_jmap_ref(zinfo, &jmap);
 
 	if (error != 0) {
 		pthread_mutex_unlock(&zinfo->snap_map_mutex);
