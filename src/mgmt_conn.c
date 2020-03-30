@@ -717,6 +717,174 @@ internal_snapshot(char *snap)
 	return (B_FALSE);
 }
 
+/*
+ * This fn returns map of snapshots by walking through datasets in json
+ * format. Returns 0 on success.
+ * This will return EAGAIN if the replica is NOT connected to target.
+ */
+static struct json_object *
+uzfs_zvol_fetch_snapshot_jmap(zvol_info_t *zinfo, int *err)
+{
+	char *snapname;
+	boolean_t case_conflict;
+	uint64_t id, pos = 0;
+	int error = 0;
+	zvol_state_t *zv = (zvol_state_t *)zinfo->main_zv;
+	objset_t *os = zv->zv_objset;
+	dsl_dataset_t *ds;
+	dsl_pool_t *dp;
+	struct json_object *jmap = NULL;
+
+	snapname = kmem_zalloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
+
+	if ((os == NULL) || (os->os_dsl_dataset == NULL) ||
+	    (os->os_dsl_dataset->ds_dir == NULL) ||
+	    (os->os_dsl_dataset->ds_dir->dd_pool == NULL)) {
+		error = EAGAIN;
+		goto out;
+	}
+
+	jmap = json_object_new_object();
+	dp = os->os_dsl_dataset->ds_dir->dd_pool;
+
+	while (error == 0) {
+		dsl_pool_config_enter(dmu_objset_pool(os), FTAG);
+		error = dmu_snapshot_list_next(os,
+		    ZFS_MAX_DATASET_NAME_LEN, snapname, &id, &pos,
+		    &case_conflict);
+		if (error) {
+			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
+			break;
+		}
+
+		if (internal_snapshot(snapname)) {
+			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
+			continue;
+		}
+
+		dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
+
+		json_object_object_add(jmap, snapname, NULL);
+	}
+
+	if ((error == ENOENT) || (error == 0)) {
+		error = 0;
+	} else {
+		json_object_put(jmap);
+		jmap = NULL;
+	}
+out:
+	kmem_free(snapname, ZFS_MAX_DATASET_NAME_LEN);
+	*err = error;
+
+	return (jmap);
+}
+
+/*
+ * This fn returns reference to zinfo's map of snap json_object.
+ * If its NULL, it creates one and returns it
+ * Its the responsibility of caller to release the reference.
+ * Also, this fn need to be called with snap_map_mutex.
+ */
+int
+uzfs_zvol_get_snap_jmap_ref(zvol_info_t *zinfo, struct json_object **jmapp)
+{
+	struct json_object *jmap;
+	int error = 0;
+
+	ASSERT(MUTEX_HELD(&zinfo->snap_map_mutex));
+	*jmapp = NULL;
+	if (zinfo->snap_map == NULL) {
+
+		jmap = uzfs_zvol_fetch_snapshot_jmap(zinfo, &error);
+
+		if (error)
+			return (error);
+
+		zinfo->snap_map = jmap;
+	}
+	jmap = json_object_get(zinfo->snap_map);
+
+	*jmapp = jmap;
+	return (0);
+}
+
+/*
+ * This fn adds/deletes snapname to zinfo's snap_map in json format.
+ * If errors, sets snap_map to NULL as update failed
+ * This fn is currently called only if snapshot is created / deleted through
+ * istgt, but, not through CLI
+ */
+int
+uzfs_zvol_update_snapshot_jmap(zvol_info_t *zinfo, char *snapname,
+    boolean_t add)
+{
+	int ret = 0;
+	struct json_object *jmap;
+
+	mutex_enter(&zinfo->snap_map_mutex);
+	ret = uzfs_zvol_get_snap_jmap_ref(zinfo, &jmap);
+	if (ret == 0) {
+		if (add)
+			json_object_object_add(jmap, snapname, NULL);
+		else
+			json_object_object_del(jmap, snapname);
+		json_object_put(jmap);
+	} else {
+		if (zinfo->snap_map != NULL)
+			json_object_put(zinfo->snap_map);
+		zinfo->snap_map = NULL;
+	}
+	mutex_exit(&zinfo->snap_map_mutex);
+	return (0);
+}
+
+/*
+ * This fn gets the list of snapshots in json format, and adds it to nvl.
+ * `json_object_to_json_string_ext` is a single threaded fn, i.e., interally,
+ * this library uses a single buffer
+ * https://html.developreference.com/article/23032444/, and thus,
+ * lock has been added while using the jarray which is ref of snap_list jobj.
+ *
+ * Caller need to take refcount on zinfo so that snap_list is safe to use.
+ */
+int
+uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
+{
+	struct json_object *jmap, *jobj;
+	int error = 0;
+	const char *json_string;
+
+	mutex_enter(&zinfo->snap_map_mutex);
+	error = uzfs_zvol_get_snap_jmap_ref(zinfo, &jmap);
+
+	if (error != 0) {
+		mutex_exit(&zinfo->snap_map_mutex);
+		LOG_ERR("err %d for %s listsnap", error, zinfo->name);
+		return (error);
+	}
+
+	jobj = json_object_new_object();
+	json_object_object_add(jobj, "name",
+	    json_object_new_string(zinfo->name));
+	json_object_object_add(jobj, "snaplist", jmap);
+
+	json_string = json_object_to_json_string_ext(jobj,
+	    JSON_C_TO_STRING_PLAIN);
+	fnvlist_add_string(nvl, "listsnap", json_string);
+
+	/* This will decrement refcount of jmap as well */
+	json_object_put(jobj);
+	mutex_exit(&zinfo->snap_map_mutex);
+
+	return (0);
+}
+
+/*
+ * This fn returns list of snapshots by walking through datasets in string
+ * format. Returns 0 on success.
+ * This will return EAGAIN if the replica is NOT connected to target.
+ */
 static int
 uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
     size_t *buflen)
@@ -729,16 +897,25 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
 	objset_t *os = zv->zv_objset;
 	struct zvol_snapshot_list *snap_list;
 	dsl_dataset_t *ds;
-	dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
+	dsl_pool_t *dp;
 	objset_t *snap_os;
 	nvlist_t *nv;
-	struct json_object *jobj, *jarray, *jprop;
+	struct json_object *jobj, *jarray = NULL, *jprop;
 	const char *json_string;
 	uint64_t total_len;
 	char err_msg[128];
 
 	snapname = kmem_zalloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP);
 	jarray = json_object_new_array();
+
+	if ((os == NULL) || (os->os_dsl_dataset == NULL) ||
+	    (os->os_dsl_dataset->ds_dir == NULL) ||
+	    (os->os_dsl_dataset->ds_dir->dd_pool == NULL)) {
+		error = EAGAIN;
+		goto out;
+	}
+
+	dp = os->os_dsl_dataset->ds_dir->dd_pool;
 
 	while (error == 0) {
 		prop_error = TRUE;
@@ -748,7 +925,7 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
 		    &case_conflict);
 		if (error) {
 			dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
-			goto out;
+			break;
 		}
 
 		if (internal_snapshot(snapname)) {
@@ -787,8 +964,8 @@ uzfs_zvol_fetch_snapshot_list(zvol_info_t *zinfo, char *snap, void **buf,
 			nvlist_free(nv);
 		} else {
 			snprintf(err_msg, sizeof (err_msg),
-			    "Failed to fetch snapshot details.. err(%d)",
-			    error);
+			    "Failed to fetch snap %s details.. err(%d)",
+			    snapname, error);
 			json_object_object_add(jprop, "error",
 			    json_object_new_string(err_msg));
 		}
@@ -894,6 +1071,10 @@ uzfs_zvol_create_snapshot_update_zap(zvol_info_t *zinfo,
 	    snapshot_io_num - 1);
 
 	ret = dmu_objset_snapshot_one(zinfo->name, snapname);
+
+	if (ret == 0)
+		uzfs_zvol_update_snapshot_jmap(zinfo, snapname, B_TRUE);
+
 	return (ret);
 }
 
@@ -1063,6 +1244,7 @@ uzfs_zvol_execute_async_command(void *arg)
 		snap = async_task->payload;
 		dataset = kmem_asprintf("%s@%s", zinfo->name, snap);
 		rc = dsl_destroy_snapshot(dataset, B_FALSE);
+		uzfs_zvol_update_snapshot_jmap(zinfo, snap, B_FALSE);
 		strfree(dataset);
 		if (rc != 0) {
 			LOG_ERR("Failed to destroy %s@%s: %d",

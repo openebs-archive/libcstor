@@ -31,6 +31,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <uzfs_rebuilding.h>
+#include <json-c/json_object.h>
 
 #define	ZVOL_THREAD_STACKSIZE (2 * 1024 * 1024)
 
@@ -322,6 +323,7 @@ uzfs_zinfo_init_mutex(zvol_info_t *zinfo)
 	(void) pthread_mutex_init(&zinfo->zinfo_mutex, NULL);
 	(void) pthread_cond_init(&zinfo->io_ack_cond, NULL);
 	(void) pthread_mutex_init(&zinfo->zinfo_ionum_mutex, NULL);
+	mutex_init(&zinfo->snap_map_mutex, NULL, MUTEX_DEFAULT, NULL);
 }
 
 static void
@@ -331,6 +333,7 @@ uzfs_zinfo_destroy_mutex(zvol_info_t *zinfo)
 	(void) pthread_mutex_destroy(&zinfo->zinfo_mutex);
 	(void) pthread_cond_destroy(&zinfo->io_ack_cond);
 	(void) pthread_mutex_destroy(&zinfo->zinfo_ionum_mutex);
+	mutex_destroy(&zinfo->snap_map_mutex);
 }
 
 int
@@ -440,6 +443,9 @@ uzfs_zinfo_free(zvol_info_t *zinfo)
 	taskq_destroy(zinfo->uzfs_zvol_taskq);
 	(void) uzfs_zinfo_destroy_mutex(zinfo);
 	ASSERT(STAILQ_EMPTY(&zinfo->complete_queue));
+
+	if (zinfo->snap_map)
+		json_object_put(zinfo->snap_map);
 
 	free(zinfo);
 	return (0);

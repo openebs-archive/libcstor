@@ -91,6 +91,7 @@ typedef struct uzfs_monitor {
     _UZFS_IOC(ZFS_IOC_CLONE, 1, 1, "clone the volume")                         \
     _UZFS_IOC(ZFS_IOC_ERROR_LOG, 0, 0, "get the error log")                    \
     _UZFS_IOC(ZFS_IOC_STATS, 0, 0, "get the zfs volume stats")                 \
+    _UZFS_IOC(ZFS_IOC_LIST_SNAP, 0, 0, "get the volume snapshots list")        \
     _UZFS_IOC(ZFS_IOC_CLEAR, 1, 0, "clear the zpool error counters")
 
 
@@ -108,6 +109,7 @@ extern int uzfs_recv_response(int fd, zfs_cmd_t *zc);
 extern int uzfs_client_init(const char *sock_path);
 extern int is_main_thread(void);
 int uzfs_ioc_stats(zfs_cmd_t *zc, nvlist_t *nvl);
+int uzfs_ioc_list_snap(zfs_cmd_t *zc, nvlist_t *nvl);
 
 extern int do_sendfd(int sock, int fd);
 extern int do_recvfd(int sock);
