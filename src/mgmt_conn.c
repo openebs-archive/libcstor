@@ -793,7 +793,7 @@ uzfs_zvol_get_snap_jmap_ref(zvol_info_t *zinfo, struct json_object **jmapp)
 	int error = 0;
 
 	ASSERT(MUTEX_HELD(&zinfo->snap_map_mutex));
-	*jampp = NULL;
+	*jmapp = NULL;
 	if (zinfo->snap_map == NULL) {
 
 		jmap = uzfs_zvol_fetch_snapshot_jmap(zinfo, &error);
@@ -822,7 +822,7 @@ uzfs_zvol_update_snapshot_jmap(zvol_info_t *zinfo, char *snapname,
 	int ret = 0;
 	struct json_object *jmap;
 
-	pthread_mutex_lock(&zinfo->snap_map_mutex);
+	mutex_enter(&zinfo->snap_map_mutex);
 	ret = uzfs_zvol_get_snap_jmap_ref(zinfo, &jmap);
 	if (ret == 0) {
 		if (add)
@@ -835,7 +835,7 @@ uzfs_zvol_update_snapshot_jmap(zvol_info_t *zinfo, char *snapname,
 			json_object_put(zinfo->snap_map);
 		zinfo->snap_map = NULL;
 	}
-	pthread_mutex_unlock(&zinfo->snap_map_mutex);
+	mutex_exit(&zinfo->snap_map_mutex);
 	return (0);
 }
 
@@ -855,11 +855,11 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 	int error = 0;
 	const char *json_string;
 
-	pthread_mutex_lock(&zinfo->snap_map_mutex);
+	mutex_enter(&zinfo->snap_map_mutex);
 	error = uzfs_zvol_get_snap_jmap_ref(zinfo, &jmap);
 
 	if (error != 0) {
-		pthread_mutex_unlock(&zinfo->snap_map_mutex);
+		mutex_exit(&zinfo->snap_map_mutex);
 		LOG_ERR("err %d for %s listsnap", error, zinfo->name);
 		return (error);
 	}
@@ -875,7 +875,7 @@ uzfs_zvol_add_nvl_snapshot_list(zvol_info_t *zinfo, nvlist_t *nvl)
 
 	/* This will decrement refcount of jmap as well */
 	json_object_put(jobj);
-	pthread_mutex_unlock(&zinfo->snap_map_mutex);
+	mutex_exit(&zinfo->snap_map_mutex);
 
 	return (0);
 }
