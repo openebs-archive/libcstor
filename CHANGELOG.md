@@ -1,18 +1,18 @@
 1.9.0-RC1 / 2020-04-07
 ========================
-* Added new command listsnap under zfs to list the snapshots for dataset from cache ([#49](https://github.com/openebs/libcstor/pull/49),[@vishnuitta](https://github.com/vishnuitta))
+* added new command listsnap under zfs to list the snapshots for dataset from cache ([#49](https://github.com/openebs/libcstor/pull/49),[@vishnuitta](https://github.com/vishnuitta))
 
 
 1.8.0 / 2020-03-13
 ========================
-* Added readonly support for uzfs pool ([#43](https://github.com/openebs/libcstor/pull/43),[@mynktl](https://github.com/mynktl))
-* Added support of fetching specific snapshot details through istgt/target ([#46](https://github.com/openebs/libcstor/pull/46),[@mynktl](https://github.com/mynktl))
+* added readonly support for uzfs pool ([#43](https://github.com/openebs/libcstor/pull/43),[@mynktl](https://github.com/mynktl))
+* added support of fetching specific snapshot details through istgt/target ([#46](https://github.com/openebs/libcstor/pull/46),[@mynktl](https://github.com/mynktl))
 
 
 1.8.0-RC1 / 2020-03-06
 ========================
-* Added readonly support for uzfs pool ([#43](https://github.com/openebs/libcstor/pull/43),[@mynktl](https://github.com/mynktl))
-* Added support of fetching specific snapshot details through istgt/target ([#46](https://github.com/openebs/libcstor/pull/46),[@mynktl](https://github.com/mynktl))
+* added readonly support for uzfs pool ([#43](https://github.com/openebs/libcstor/pull/43),[@mynktl](https://github.com/mynktl))
+* added support of fetching specific snapshot details through istgt/target ([#46](https://github.com/openebs/libcstor/pull/46),[@mynktl](https://github.com/mynktl))
 
 
 1.7.0-RC1 / 2020-02-07
