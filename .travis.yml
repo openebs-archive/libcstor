@@ -64,7 +64,7 @@ install:
     - cd ..
     - cd cstor
     - sh autogen.sh
-    - ./configure --with-config=user --enable-code-coverage=yes --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
+    - ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
     - make -j4;
     # return to libcstor code to run lint checks
     - cd ..
