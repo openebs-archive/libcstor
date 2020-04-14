@@ -1,3 +1,8 @@
+1.9.0 / 2020-04-14
+========================
+* added new command listsnap under zfs to list the snapshots for dataset from cache ([#49](https://github.com/openebs/libcstor/pull/49),[@vishnuitta](https://github.com/vishnuitta))
+
+
 1.9.0-RC1 / 2020-04-07
 ========================
 * added new command listsnap under zfs to list the snapshots for dataset from cache ([#49](https://github.com/openebs/libcstor/pull/49),[@vishnuitta](https://github.com/vishnuitta))
