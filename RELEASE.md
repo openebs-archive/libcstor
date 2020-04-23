@@ -28,7 +28,21 @@ The format of the release tag is either "Release-Name-RC1" or "Release-Name" dep
 
 Once the release is triggered, Travis build process has to be monitored. Since libcstor is a library and it is published as part of [openebs/cstor](https://github.com/openebs/cstor) images, release process from libcstor repo won't publish any images.
 
-Once a release is created, update the release description with the changelog mentioned in `changelog/v1.9.x`. Once the changelogs are updated in the release, the repo owner needs to create a PR to `develop` with the following details:
-1. update the changelog from `changelog/v1.9.x` to `libcstor/CHANGELOG.md`
-2. If a release is not an RC tag then PR should include the changes to remove `changelog/v1.9.x` folder.
-3. If a release is an RC tag then PR should include the changes to remove the changelog from `changelog/v1.9.x` which are already mentioned in `libcstor/CHANGELOG.md` as part of step number 1.
+Once a release is created, update the release description with the changelog mentioned in folder `changelog/v1.9.x`. Once the changelogs are updated in the release, the repo owner needs to create a PR to `master` with the following details:
+1. update the changelog from folder `changelog/v1.9.x` to file `libcstor/CHANGELOG-v1.9.md`
+2. If a release is an RC tag then PR should include the changes to remove the changelog from folder`changelog/v1.9.x` which are already mentioned in `libcstor/CHANGELOG-v1.9.md` as part of step number 1.
+3. If a release is not an RC tag then
+    - PR should include the changes to remove files from `changelog/v1.9.x` folder.
+    - PR should update the root [CHANGELOG file](https://github.com/openebs/libcstor/blob/master/CHANGELOG.md) with contents of file `libcstor/CHANGELOG-v1.9.md`
+
+Format of the `libcstor/CHANGELOG-v1.9.md` file must be as below:
+```
+1.9.0 / 2020-04-14
+========================
+* added new command listsnap under zfs to list the snapshots for dataset from cache ([#49](https://github.com/openebs/libcstor/pull/49),[@vishnuitta](https://github.com/vishnuitta))
+
+
+1.9.0-RC1 / 2020-04-07
+========================
+* added new command listsnap under zfs to list the snapshots for dataset from cache ([#49](https://github.com/openebs/libcstor/pull/49),[@vishnuitta](https://github.com/vishnuitta))
+```
