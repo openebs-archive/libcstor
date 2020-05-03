@@ -74,9 +74,27 @@ install:
     - cd ..
     - cd cstor
 script:
-    export FIO_SRCDIR=$PWD/../fio;
-    sudo bash ./print_debug_info.sh &
-    sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
+    - export FIO_SRCDIR=$PWD/../fio;
+    - sudo bash ./print_debug_info.sh &
+    - sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
+    # If this build is running due to travis release tag, then
+    # go ahead and tag the dependent repo.
+    #  
+    # $TRAVIS_BRANCH contains the same value as $TRAVIS_TAG.
+    # Example: 1.9.0-RC1 tag and 1.9.0-RC1 branch. 
+    # OpenEBS release are done from branches named as v1.9.x. 
+    # Convert the TRAVIS_TAG to the corresponding release branch.
+    # 
+    # Allow for building forked openebs pipelines. 
+    # Tag the downstream repos under current repo org. 
+    - if [ -z $REPO_ORG ]; then
+        REPO_ORG=$(echo "$TRAVIS_REPO_SLUG" | cut -d'/' -f1);
+        export REPO_ORG;
+      fi
+    - if [ ! -z $TRAVIS_TAG ] && [ "$TRAVIS_REPO_SLUG" == "$REPO_ORG/libcstor" ]; then
+        REL_BRANCH=$(echo v$(echo "$TRAVIS_TAG" | cut -d'-' -f1 | rev | cut -d'.' -f2- | rev).x) ;
+        ./buildscripts/git-release "$REPO_ORG/cstor" "$TRAVIS_TAG" "$REL_BRANCH" || travis_terminate 1;
+      fi
 after_failure:
     - find /var/tmp/test_results/current/log -type f -name '*' -printf "%f\n" -exec cut -c -$CSTOR_TEST_TRAVIS_LOG_MAX_LENGTH {} \;
 after_success:
