@@ -152,51 +152,6 @@ vdev_disk_aio_done(aio_task_t *task, int64_t res)
 }
 
 /*
- * A copy of aio ring structure to be able to access aio events from userland.
- */
-struct aio_ring {
-	unsigned id;	/* kernel internal index number */
-	unsigned nr;	/* number of io_events */
-	unsigned head;
-	unsigned tail;
-
-	unsigned magic;
-	unsigned compat_features;
-	unsigned incompat_features;
-	unsigned header_length;  /* size of aio_ring */
-
-	struct io_event events[0];
-};
-
-#define	AIO_RING_MAGIC	0xa10a10a1
-
-static int
-user_io_getevents(io_context_t io_ctx, struct io_event *events)
-{
-	long i = 0;
-	unsigned head;
-	struct aio_ring *ring = (struct aio_ring *)io_ctx;
-
-	while (i < zfs_vdev_max_active) {
-		head = ring->head;
-
-		if (head == ring->tail) {
-			/* There are no more completions */
-			break;
-		} else {
-			/* There is another completion to reap */
-			events[i] = ring->events[head];
-			/* read barrier */
-			asm volatile("": : :"memory");
-			ring->head = (head + 1) % ring->nr;
-			i++;
-		}
-	}
-
-	return (i);
-}
-
-/*
  * Poll for asynchronous IO done events and dispatch completed IOs to zio
  * pipeline.
  */
@@ -217,21 +172,10 @@ vdev_disk_aio_poller(void *arg)
 	while (!vda->vda_stop_polling) {
 		timeout.tv_sec = 0;
 		timeout.tv_nsec = POLL_SLEEP;
-		nr = 0;
 
-		/* First we try non-blocking userspace poll which is fast */
-		if (((struct aio_ring *)(vda->vda_io_ctx))->magic ==
-		    AIO_RING_MAGIC) {
-			nr = user_io_getevents(vda->vda_io_ctx, events);
-		}
-		if (nr <= 0) {
-			/* Do blocking kernel poll */
-			nr = io_getevents(vda->vda_io_ctx, 1,
-			    zfs_vdev_max_active, events, &timeout);
-			VDA_STAT_BUMP(vda_stat_kernel_polls);
-		} else {
-			VDA_STAT_BUMP(vda_stat_userspace_polls);
-		}
+		nr = io_getevents(vda->vda_io_ctx, 1,
+		    zfs_vdev_max_active, events, &timeout);
+		VDA_STAT_BUMP(vda_stat_kernel_polls);
 
 		if (nr < 0) {
 			int error = -nr;
