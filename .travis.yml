@@ -9,6 +9,20 @@ env:
   global:
     # Travis limits maximum log size, we have to cut tests output
     - CSTOR_TEST_TRAVIS_LOG_MAX_LENGTH=800
+jobs:
+  include:
+    - os: linux
+      arch: amd64
+      env:
+        - RUN_UZFS_TESTS=1
+        - RELEASE_TAG_DOWNSTREAM=1
+    - os: linux
+      arch: arm64
+      env:
+        - RUN_UZFS_TESTS=0
+        - RUN_ZTESTS=0
+        - RELEASE_TAG_DOWNSTREAM=0
+
 before_install:
     - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
     - sudo apt-get update -qq
@@ -55,6 +69,9 @@ install:
     - cd cstor
     - if [ ${TRAVIS_BRANCH} == "master" ]; then git checkout develop; else git checkout ${TRAVIS_BRANCH} || git checkout develop; fi
     - git branch
+    - sh autogen.sh
+    - ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
+    - make -j4;
     - cd ..
     # return to libcstor code
     - cd libcstor
@@ -63,22 +80,18 @@ install:
     - make -j4
     - sudo make install
     - sudo ldconfig
-    - cd ..
-    - cd cstor
-    - sh autogen.sh
-    - ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
-    - make -j4;
-    # return to libcstor code to run lint checks
-    - cd ..
-    - cd libcstor
     - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
     # back to cstor for running further tests.
     - cd ..
     - cd cstor
 script:
-    - export FIO_SRCDIR=$PWD/../fio;
-    - sudo bash ./print_debug_info.sh &
-    - sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
+    # run ztest and test supported zio backends
+    - if [ $RUN_UZFS_TESTS = 1 ]; then
+        export FIO_SRCDIR=$PWD/../fio;
+        sudo bash ./print_debug_info.sh &
+        sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
+      fi
+    - ./build_image.sh || travis_terminate 1;
     # If this build is running due to travis release tag, then
     # go ahead and tag the dependent repo.
     #  
@@ -113,7 +126,7 @@ script:
           REL_SUFFIX="-$TAG_SUFFIX";
         fi;
         REL_BRANCH=$(echo $(echo "$TRAVIS_TAG" | cut -d'-' -f1 | rev | cut -d'.' -f2- | rev).x$REL_SUFFIX) ;
-        ./buildscripts/git-release "$REPO_ORG/cstor" "$TRAVIS_TAG" "$REL_BRANCH" || travis_terminate 1;
+        ./buildscripts/git-release "$REPO_ORG/istgt" "$TRAVIS_TAG" "$REL_BRANCH" || travis_terminate 1;
       fi
 after_failure:
     - find /var/tmp/test_results/current/log -type f -name '*' -printf "%f\n" -exec cut -c -$CSTOR_TEST_TRAVIS_LOG_MAX_LENGTH {} \;

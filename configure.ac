@@ -28,9 +28,12 @@ AC_HEADER_STDC
 
 CSTOR_AC_DEBUG
 CSTOR_AC_CONFIG_ZFS
+CSTOR_AC_CONFIG_USER_FRAME_LARGER_THAN
 
 AC_CONFIG_FILES([
                  Makefile
+                 cmd/Makefile
+                 cmd/zrepl/Makefile
                  src/Makefile
                  include/Makefile
                  include/sys/Makefile
