@@ -27,11 +27,19 @@ before_install:
     - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
     - sudo apt-get update -qq
     - sudo apt-get install --yes -qq gcc-6 g++-6
-    - sudo apt-get install --yes -qq build-essential autoconf libtool gawk alien fakeroot linux-headers-$(uname -r) libaio-dev jq
+    - sudo apt-get install --yes -qq build-essential autoconf libtool gawk alien fakeroot libaio-dev jq
+    # linux-header package name is different on arm.
+    - if [ "$TRAVIS_CPU_ARCH" == "arm64" ]; then
+        sudo apt-get install --yes -qq linux-headers-generic;
+      else
+        sudo apt-get install --yes -qq linux-headers-$(uname -r);
+      fi
     - sudo apt-get install --yes -qq zlib1g-dev uuid-dev libattr1-dev libblkid-dev libselinux-dev libudev-dev libssl-dev libjson-c-dev
     - sudo apt-get install --yes -qq lcov libjemalloc-dev
-    # packages for tests
-    - sudo apt-get install --yes -qq parted lsscsi ksh attr acl nfs-kernel-server fio
+    # packages for tests - only on amd64
+    - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then
+        sudo apt-get install --yes -qq parted lsscsi ksh attr acl nfs-kernel-server fio;
+      fi
     - sudo apt-get install --yes -qq libgtest-dev cmake
     # packages for debugging
     - sudo apt-get install gdb
@@ -64,23 +72,32 @@ install:
     - ./configure
     - make -j4
     - cd ..
-    # we need cstor code
+    # we need cstor code for compiling libcstor(uZFS feature)
     - git clone https://github.com/openebs/cstor.git
     - cd cstor
     - if [ ${TRAVIS_BRANCH} == "master" ]; then git checkout develop; else git checkout ${TRAVIS_BRANCH} || git checkout develop; fi
     - git branch
-    - sh autogen.sh
-    - ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
-    - make -j4;
-    - cd ..
-    # return to libcstor code
-    - cd libcstor
+    # Return to libcstor code base
+    - popd
     - sh autogen.sh
     - ./configure --enable-debug --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
     - make -j4
     - sudo make install
     - sudo ldconfig
+    # Return to cstor code
+    - cd ..
+    - cd cstor
+    - sh autogen.sh
+    - ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
+    - make -j4;
+    # Return to libcstor code to complie zrepl which contains main and to run lint checks
+    - cd ..
+    - cd libcstor
     - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
+    # Go to zrepl directory to build zrepl related targets
+    - cd cmd/zrepl
+    - make
+    - cd ../../
     # back to cstor for running further tests.
     - cd ..
     - cd cstor
@@ -91,6 +108,9 @@ script:
         sudo bash ./print_debug_info.sh &
         sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
       fi
+    # Go back to libcstor to build images
+    - cd ..
+    - cd libcstor
     - ./build_image.sh || travis_terminate 1;
     # If this build is running due to travis release tag, then
     # go ahead and tag the dependent repo.
