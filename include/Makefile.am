@@ -1,4 +1,4 @@
-SUBDIRS = sys generic arch/arm arch/x86
+SUBDIRS = sys generic arch/arm arch/x86 arch/ppc
 
 HEADER_H = \
 	$(top_srcdir)/include/data_conn.h	\

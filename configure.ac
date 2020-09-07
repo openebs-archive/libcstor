@@ -37,6 +37,7 @@ AC_CONFIG_FILES([
                  include/generic/Makefile
                  include/arch/x86/Makefile
                  include/arch/arm/Makefile
+                 include/arch/ppc/Makefile
 ])
 
 AC_OUTPUT
