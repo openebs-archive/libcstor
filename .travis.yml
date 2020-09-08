@@ -92,7 +92,7 @@ install:
     # Return to libcstor code to complie zrepl which contains main process and to run lint checks
     - cd ..
     - cd libcstor
-    - make check_license
+    - make check-license
     - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
     # Go to zrepl directory to build zrepl related targets
     - cd cmd/zrepl
