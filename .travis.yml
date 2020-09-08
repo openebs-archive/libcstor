@@ -20,7 +20,6 @@ jobs:
       arch: arm64
       env:
         - RUN_UZFS_TESTS=0
-        - RUN_ZTESTS=0
         - RELEASE_TAG_DOWNSTREAM=0
 
 before_install:
@@ -61,7 +60,7 @@ install:
     # we need fio repo to build zfs replica fio engine
     - git clone https://github.com/axboe/fio
     - cd fio
-    - git checkout fio-3.7
+    - git checkout fio-3.9
     - ./configure
     - make -j4
     - cd ..
@@ -90,9 +89,10 @@ install:
     - sh autogen.sh
     - ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
     - make -j4;
-    # Return to libcstor code to complie zrepl which contains main and to run lint checks
+    # Return to libcstor code to complie zrepl which contains main process and to run lint checks
     - cd ..
     - cd libcstor
+    - make check_license
     - make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
     # Go to zrepl directory to build zrepl related targets
     - cd cmd/zrepl

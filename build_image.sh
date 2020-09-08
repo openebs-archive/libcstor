@@ -6,14 +6,6 @@ pwd
 # Determine the arch/os we're building for
 ARCH=$(uname -m)
 
-# Build cstor
-cd ../cstor
-make clean
-sh autogen.sh
-./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor=$PWD/../libcstor/include
-make clean
-make -j$(nproc)
-
 # Build libcstor
 cd ../libcstor
 make clean
@@ -22,6 +14,21 @@ sh autogen.sh
 make -j$(nproc)
 sudo make install
 sudo ldconfig
+
+
+# Build cstor
+cd ../cstor
+make clean
+sh autogen.sh
+./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor=$PWD/../libcstor/include
+make clean
+make -j$(nproc)
+
+# Build zrepl target and docker files exist in libcstor
+cd ../libcstor/cmd/zrepl
+make clean
+make
+cd ../../
 
 # The images can be pushed to any docker/image registeries
 # like docker hub, quay. The registries are specified in 

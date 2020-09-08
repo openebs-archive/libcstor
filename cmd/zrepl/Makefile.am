@@ -4,7 +4,15 @@ AM_CFLAGS = $(FRAME_LARGER_THAN)
 # Dynamic symbol table is needed for printing symbol names in stack trace
 AM_LDFLAGS = -rdynamic
 
-AM_CPPFLAGS  = -D_GNU_SOURCE
+AM_CPPFLAGS  = -D_GNU_SOURCE -D__EXTENSIONS__ -D_REENTRANT
+AM_CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_FILE_OFFSET_BITS=64
+AM_CPPFLAGS += -D_LARGEFILE64_SOURCE -DHAVE_LARGE_STACKS=1
+AM_CPPFLAGS += -DTEXT_DOMAIN=\"zfs-linux-user\"
+AM_CPPFLAGS += -DLIBEXECDIR=\"$(libexecdir)\"
+AM_CPPFLAGS += -DRUNSTATEDIR=\"$(runstatedir)\"
+AM_CPPFLAGS += -DSBINDIR=\"$(sbindir)\"
+AM_CPPFLAGS += -DSYSCONFDIR=\"$(sysconfdir)\"
+AM_CPPFLAGS += $(CODE_COVERAGE_CPPFLAGS) $(UZFS_CFLAGS)
 
 DEFAULT_INCLUDES = \
 	-I$(top_srcdir)/include	\
@@ -18,9 +26,9 @@ zrepl_SOURCES = \
 
 zrepl_LDADD = \
      $(zfssrc)/../lib/libnvpair/libnvpair.la \
-	 $(zfssrc)/../lib/libuutil/libuutil.la \
-	 $(zfssrc)/../lib/libzpool/libzpool.la \
+     $(zfssrc)/../lib/libuutil/libuutil.la \
+     $(zfssrc)/../lib/libzpool/libzpool.la \
      $(zfssrc)/../lib/libzfs/libzfs.la \
      $(zfssrc)/../lib/libzfs_core/libzfs_core.la
 
-zrepl_LDADD += -lcstor
+zrepl_LDADD += -lcstor -ludev -luuid -lz
