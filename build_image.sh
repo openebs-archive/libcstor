@@ -22,14 +22,12 @@ pwd
 ARCH=$(uname -m)
 
 # Build libcstor
-cd ../libcstor
 make clean
 sh autogen.sh
 ./configure --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
 make -j$(nproc)
 sudo make install
 sudo ldconfig
-
 
 # Build cstor
 cd ../cstor
@@ -39,7 +37,7 @@ sh autogen.sh
 make clean
 make -j$(nproc)
 
-# Build zrepl target and docker files exist in libcstor
+# Build zrepl binary
 cd ../libcstor/cmd/zrepl
 make clean
 make
@@ -71,7 +69,7 @@ DBUILD_DATE=$(date +'%Y-%m-%dT%H:%M:%SZ')
 
 # Specify the docker arg for repository url
 if [ -z "${DBUILD_REPO_URL}" ]; then
-  DBUILD_REPO_URL="https://github.com/openebs/cstor"
+  DBUILD_REPO_URL="https://github.com/openebs/libcstor"
 fi
 
 # Specify the docker arg for website url
@@ -122,10 +120,6 @@ cd docker && \
  sudo docker build -f ${DOCKERFILE_BASE} -t ${REPO_NAME}:ci ${DBUILD_ARGS} . && \
  DIMAGE=${REPO_NAME} ./push && \
  cd ..
-if [ $? -ne 0 ]; then
- echo "Failed to run push script for ${REPO_NAME}"
- exit 1
-fi
 
 if [ "${ARCH}" = "x86_64" ]; then
 	REPO_NAME="$IMAGE_ORG/cstor-pool"
@@ -138,9 +132,5 @@ cd docker && \
  sudo docker build -f ${DOCKERFILE} -t ${REPO_NAME}:ci ${DBUILD_ARGS} . && \
  DIMAGE=${REPO_NAME} ./push && \
  cd ..
-if [ $? -ne 0 ]; then
- echo "Failed to run push script for ${REPO_NAME}"
- exit 1
-fi
 
 rm -rf ./docker/zfs
