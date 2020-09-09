@@ -8,6 +8,7 @@ AC_DEFUN([CSTOR_AC_CONFIG_ZFS], [
     AC_MSG_CHECKING([zfs header file source])
     AC_MSG_RESULT([$ZFS_SRC])
     AC_SUBST(ZFS_SRC)
+	AC_SUBST(zfssrc)
     AC_DEFINE_UNQUOTED([ZFS_SRC], [$ZFS_SRC], [zfs header file source])
 
 

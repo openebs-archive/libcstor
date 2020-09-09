@@ -1,4 +1,4 @@
-# Copyright © 2017-2019 The OpenEBS Authors
+# Copyright © 2020 The OpenEBS Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HEADER_H = \
-	$(top_srcdir)/include/arch/x86/rte_atomic_64.h	\
-	$(top_srcdir)/include/arch/x86/rte_atomic_32.h	\
-	$(top_srcdir)/include/arch/x86/rte_atomic.h		\
-	$(top_srcdir)/include/arch/x86/rte_pause.h
-
-libcstordir = $(includedir)/libcstor/arch/x86
-libcstor_HEADERS = $(HEADER_H)
-
+SUBDIRS = zrepl
