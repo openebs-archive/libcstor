@@ -25,16 +25,16 @@
   sudo make -j4
   sudo cp *.a /usr/lib
   ```
-* Make sure that you have cloned cstor code in the system. Refer [cstor setup](https://github.com/openebs/cstor/blob/master/developer-setup.md)
+* Make sure that you have cloned cstor code in the system. Refer [cstor setup](https://github.com/openebs/cstor/blob/develop/developer-setup.md)
 
   **NOTE**: libcstor and cstor must present in the same parent directory.
 
-* Make sure that you have cloned and build fio(branch fio-3.7) code in the linux system.
+* Make sure that you have cloned and build fio(branch fio-3.9) code in the linux system.
   Please use below command for the fio
   ```sh
   git clone https://github.com/axboe/fio
   cd fio
-  git checkout fio-3.7
+  git checkout fio-3.9
   ./configure
   make -j4
   ```
@@ -70,7 +70,7 @@ git remote -v
 * To build the libcstor library
   ```sh
   sh autogen.sh
-  ./configure --with-config=user --enable-debug --enable-uzfs=yes --with-jemalloc --with-spl-headers=$PWD/../cstor/lib/libspl/include
+  ./configure --enable-debug --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
   make
   ```
 
@@ -98,11 +98,11 @@ git remote -v
   ```
 
 * Test your changes
-  
+
   Integration tests are written in c and c+. Test script is maintained at https://github.com/openebs/libcstor/blob/master/tests/cstor/script/test_uzfs.sh
   To run the run the integration tests go to cstor directory and run below command.
   ```sh
-  ./tests/cstor/script/test_uzfs.sh -T all
+  ../libcstor/tests/cstor/script/test_uzfs.sh -T all
   ```
 
 ## Git Development Workflow
