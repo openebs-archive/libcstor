@@ -109,8 +109,7 @@ script:
         sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
       fi
     # Go back to libcstor to build images
-    - cd ..
-    - cd libcstor
+    - cd ../libcstor
     - ./build_image.sh || travis_terminate 1;
     # If this build is running due to travis release tag, then
     # go ahead and tag the dependent repo.

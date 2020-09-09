@@ -18,7 +18,7 @@ Once all the above tests are completed, a main release tagged image is published
 
 ## Release Tagging
 
-libcstor is released as a library part of [github/cstor](https://github.com/openebs/cstor) container image with a versioned tag.
+libcstor is released as a container image with a versioned tag.
 
 Before creating a release, the repo owner needs to create a separate branch from the active branch, which is `master`. Name of the branch should follow the naming convention of `v.1.9.x` if release is for v1.9.0.
 
@@ -26,7 +26,20 @@ Once the release branch is created, changelog from `changelogs/unreleased` needs
 
 The format of the release tag is either "Release-Name-RC1" or "Release-Name" depending on whether the tag is a release candidate or a release. (Example: v1.9.0-RC1 is a GitHub release tag for libcstor release build. v1.9.0 is the release tag that is created after the release criteria are satisfied by the libcstor builds.)
 
-Once the release is triggered, Travis build process has to be monitored. Since libcstor is a library and it is published as part of [openebs/cstor](https://github.com/openebs/cstor) images, release process from libcstor repo won't publish any images.
+Once the release is triggered, Travis build process has to be monitored. Once Travis build is passed images are pushed to docker hub and quay.io. Images can be verified by going through docker hub and quay.io. Also the images shouldn't have any high level vulnerabilities.
+
+Images are published at the following location:
+For AMD64:
+```
+https://quay.io/repository/openebs/cstor-pool?tab=tags
+https://hub.docker.com/r/openebs/cstor-pool/tags
+```
+
+For ARM64:
+```
+https://quay.io/repository/openebs/cstor-pool-arm64?tab=tags
+https://hub.docker.com/r/openebs/cstor-pool-arm64/tags
+```
 
 Once a release is created, update the release description with the changelog mentioned in folder `changelog/v1.9.x`. Once the changelogs are updated in the release, the repo owner needs to create a PR to `master` with the following details:
 1. update the changelog from folder `changelog/v1.9.x` to file `libcstor/CHANGELOG-v1.9.md`

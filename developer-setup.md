@@ -27,9 +27,11 @@
   ```
 * Make sure that you have cloned cstor code in the system. Refer [cstor setup](https://github.com/openebs/cstor/blob/master/developer-setup.md)
 
+  **NOTE**: libcstor and cstor must present in the same parent directory.
+
 * Make sure that you have cloned and build fio(branch fio-3.7) code in the linux system.
   Please use below command for the fio
-  ``sh
+  ```sh
   git clone https://github.com/axboe/fio
   cd fio
   git checkout fio-3.7
@@ -66,29 +68,42 @@ git remote -v
 ### Building and Testing your changes
 
 * To build the libcstor library
-```sh
-sh autogen.sh
-./configure --with-config=user --enable-debug --enable-uzfs=yes --with-jemalloc --with-spl-headers=$PWD/../cstor/lib/libspl/include
-make
-```
+  ```sh
+  sh autogen.sh
+  ./configure --with-config=user --enable-debug --enable-uzfs=yes --with-jemalloc --with-spl-headers=$PWD/../cstor/lib/libspl/include
+  make
+  ```
 
 * To install the library in local machine
-```sh
-sudo make install
-sudo ldconfig
-```
+  ```sh
+  sudo make install
+  sudo ldconfig
+  ```
 
 * To verify the coding style
-```sh
-make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
-```
+  ```sh
+  make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
+  ```
+
+* To verify license checks
+  ```sh
+  make check-license
+  ```
+
+* To build the zrepl binary(main process of cstor)
+  ```sh
+  cd cmd/zrepl
+  make
+  cd ../../
+  ```
 
 * Test your changes
-Integration tests are written in c and c+. Test script is maintained at https://github.com/openebs/libcstor/blob/master/tests/cstor/script/test_uzfs.sh
-To run the run the integration tests.
-```sh
-./tests/cstor/script/test_uzfs.sh -T all
-```
+  
+  Integration tests are written in c and c+. Test script is maintained at https://github.com/openebs/libcstor/blob/master/tests/cstor/script/test_uzfs.sh
+  To run the run the integration tests go to cstor directory and run below command.
+  ```sh
+  ./tests/cstor/script/test_uzfs.sh -T all
+  ```
 
 ## Git Development Workflow
 
