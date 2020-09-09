@@ -37,7 +37,7 @@ before_install:
     - sudo apt-get install --yes -qq lcov libjemalloc-dev
     # packages for tests - only on amd64
     - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then
-        sudo apt-get install --yes -qq parted lsscsi ksh attr acl nfs-kernel-server
+        sudo apt-get install --yes -qq parted lsscsi ksh attr acl nfs-kernel-server;
       fi
     - sudo apt-get install --yes -qq libgtest-dev cmake
     # packages for debugging
