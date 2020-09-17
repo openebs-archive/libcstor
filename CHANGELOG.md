@@ -1,3 +1,9 @@
+v2.1.0 / 2020-09-14
+========================
+* chore(build): build and push images to repositories from libcstor ([#70](https://github.com/openebs/libcstor/pull/70),[@mittachaitu](https://github.com/mittachaitu))
+* feat(build): Add RTE header files for ppc builds ([#69](https://github.com/openebs/libcstor/pull/69),[@shubham14bajpai](https://github.com/shubham14bajpai))
+
+
 v2.0.0 / 2020-08-14
 ========================
 
