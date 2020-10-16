@@ -1,3 +1,7 @@
+v2.2.0 / 2020-10-13
+========================
+
+
 v2.1.0 / 2020-09-14
 ========================
 * chore(build): build and push images to repositories from libcstor ([#70](https://github.com/openebs/libcstor/pull/70),[@mittachaitu](https://github.com/mittachaitu))
