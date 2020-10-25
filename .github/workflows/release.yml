@@ -27,13 +27,19 @@ jobs:
 
       - name: Set Tag
         run: |
-          echo "::set-env name=TAG::${GITHUB_REF#refs/*/v}"
+          TAG="${GITHUB_REF#refs/*/v}"
+          echo "::set-env name=TAG::${TAG}"
           echo "::set-env name=RELEASE_TAG::${TAG}"
           echo "RELEASE_TAG ${TAG}"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: all
+
       - name: Set up Docker Buildx
         id: buildx
-        uses: crazy-max/ghaction-docker-buildx@v1
+        uses: docker/setup-buildx-action@v1
         with:
           version: latest
 
@@ -44,6 +50,8 @@ jobs:
         run: echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
 
       - name: Build & Push Image
+        env:
+          IMAGE_ORG: ${{ secrets.IMAGE_ORG}}
         run: |
           make -f Makefile.buildx.mk docker.buildx.cstor-base
           make -f Makefile.buildx.mk buildx.push.cstor-base
@@ -57,13 +65,19 @@ jobs:
 
       - name: Set Tag
         run: |
-          echo "::set-env name=TAG::${GITHUB_REF#refs/*/v}"
+          TAG="${GITHUB_REF#refs/*/v}"
+          echo "::set-env name=TAG::${TAG}"
           echo "::set-env name=RELEASE_TAG::${TAG}"
           echo "RELEASE_TAG ${TAG}"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: all
+
       - name: Set up Docker Buildx
         id: buildx
-        uses: crazy-max/ghaction-docker-buildx@v1
+        uses: docker/setup-buildx-action@v1
         with:
           version: latest
 
@@ -74,6 +88,8 @@ jobs:
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build & Push Image
+        env:
+          IMAGE_ORG: ${{ secrets.IMAGE_ORG}}
         run: |
           make -f Makefile.buildx.mk docker.buildx.cstor
           make -f Makefile.buildx.mk buildx.push.cstor

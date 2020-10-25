@@ -71,7 +71,7 @@ endif
 DOCKERX_IMAGE_CSTOR_BASE:=${IMAGE_ORG}/cstor-base:${TAG}
 
 # Name of the multiarch image for cstor
-DOCKERX_IMAGE_CSTOR:=${IMAGE_ORG}/cstor:${TAG}
+DOCKERX_IMAGE_CSTOR:=${IMAGE_ORG}/cstor-pool:${TAG}
 
 # COMPONENT names for image builds
 CSTOR_BASE:=cstor-base
@@ -105,4 +105,4 @@ buildx.push.cstor-base:
 
 .PHONY: buildx.push.cstor
 buildx.push.cstor:
-	BUILDX=true DIMAGE=${IMAGE_ORG}/cstor ./build/push
+	BUILDX=true DIMAGE=${IMAGE_ORG}/cstor-pool ./build/push
