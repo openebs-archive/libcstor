@@ -26,7 +26,7 @@ DBUILD_DATE=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # Specify the docker arg for repository url
 ifeq (${DBUILD_REPO_URL}, )
-  DBUILD_REPO_URL="https://github.com/openebs/upgrade"
+  DBUILD_REPO_URL="https://github.com/openebs/libcstor"
   export DBUILD_REPO_URL
 endif
 
@@ -101,8 +101,8 @@ docker.buildx.cstor: docker.buildx
 
 .PHONY: buildx.push.cstor-base
 buildx.push.cstor-base:
-	BUILDX=true DIMAGE=${IMAGE_ORG}/cstor-base ./build/push
+	BUILDX=true DIMAGE=${IMAGE_ORG}/cstor-base ./docker/buildxpush.sh
 
 .PHONY: buildx.push.cstor
 buildx.push.cstor:
-	BUILDX=true DIMAGE=${IMAGE_ORG}/cstor-pool ./build/push
+	BUILDX=true DIMAGE=${IMAGE_ORG}/cstor-pool ./docker/buildxpush.sh
