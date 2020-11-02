@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG BASE_IMAGE
+
 FROM ubuntu:18.04 as build
 
-RUN mkdir -p libcstor
-COPY . libcstor/
+WORKDIR libcstor
+COPY . .
+
+RUN chmod +x docker/entrypoint-poolimage.sh
 
 # Final
-FROM openebs/cstor-base:ci
-
-COPY --from=build libcstor/docker/entrypoint-poolimage.sh /usr/local/bin/
-
-RUN chmod +x /usr/local/bin/entrypoint-poolimage.sh
+FROM $BASE_IMAGE
 
 ARG DBUILD_DATE
 ARG DBUILD_REPO_URL
@@ -34,6 +34,8 @@ LABEL org.label-schema.schema-version="1.0"
 LABEL org.label-schema.build-date=$DBUILD_DATE
 LABEL org.label-schema.vcs-url=$DBUILD_REPO_URL
 LABEL org.label-schema.url=$DBUILD_SITE_URL
+
+COPY --from=build libcstor/docker/entrypoint-poolimage.sh /usr/local/bin/
 
 ENTRYPOINT entrypoint-poolimage.sh
 EXPOSE 7676

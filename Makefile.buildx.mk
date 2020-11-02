@@ -84,7 +84,7 @@ docker.buildx:
 		docker buildx create --platform ${PLATFORMS} --name container-builder --use;\
 	fi
 	@docker buildx build --platform ${PLATFORMS} \
-		-t "$(DOCKERX_IMAGE_NAME)" ${DBUILD_ARGS} -f $(PWD)/docker/$(COMPONENT).Dockerfile \
+		-t "$(DOCKERX_IMAGE_NAME)" ${BUILD_ARGS} -f $(PWD)/docker/$(COMPONENT).Dockerfile \
 		. ${PUSH_ARG}
 	@echo "--> Build docker image: $(DOCKERX_IMAGE_NAME)"
 	@echo
@@ -92,11 +92,13 @@ docker.buildx:
 .PHONY: docker.buildx.cstor-base
 docker.buildx.cstor-base: DOCKERX_IMAGE_NAME=$(DOCKERX_IMAGE_CSTOR_BASE)
 docker.buildx.cstor-base: COMPONENT=$(CSTOR_BASE)
+docker.buildx.cstor-base: BUILD_ARGS=${DBUILD_ARGS}
 docker.buildx.cstor-base: docker.buildx
 
 .PHONY: docker.buildx.cstor
 docker.buildx.cstor: DOCKERX_IMAGE_NAME=$(DOCKERX_IMAGE_CSTOR)
 docker.buildx.cstor: COMPONENT=$(CSTOR)
+docker.buildx.cstor: BUILD_ARGS=--build-arg BASE_IMAGE=$(DOCKERX_IMAGE_CSTOR_BASE) ${DBUILD_ARGS}
 docker.buildx.cstor: docker.buildx
 
 .PHONY: buildx.push.cstor-base

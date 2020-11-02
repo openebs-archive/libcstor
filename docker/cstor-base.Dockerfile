@@ -18,8 +18,8 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT=""
 
-RUN mkdir -p cstor
-COPY . libcstor/
+WORKDIR libcstor
+COPY . .
 
 # install all the build dependencies
 RUN apt-get update -qq && \
@@ -30,44 +30,8 @@ RUN apt-get update -qq && \
     unlink /usr/bin/gcc && ln -s /usr/bin/gcc-6 /usr/bin/gcc && \
     unlink /usr/bin/g++ && ln -s /usr/bin/g++-6 /usr/bin/g++ 
 
-# enable gtest for builds
-RUN cd /usr/src/gtest && \
-    cmake -DBUILD_SHARED_LIBS=ON CMakeLists.txt && \
-    make && \
-    cp *.so /usr/lib && \
-    cd /
-
-# clone cstor repo for required library files
-RUN git clone https://github.com/openebs/cstor.git && \ 
-    cd cstor && \
-    git checkout develop && \
-    cd .. 
-
-# build libcstor 
-RUN cd libcstor && \
-    sh autogen.sh && \
-    ./configure --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include  && \
-    make -j4 && \
-    make install && \
-    ldconfig
-
-# build cstor
-RUN cd ../cstor && \
-    sh autogen.sh && \
-    ./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor=$PWD/../libcstor/include && \
-    make clean && \
-    make -j4
-
-# build zrepl
-RUN cd ../libcstor/cmd/zrepl && \
-    make clean && \
-    make && \
-    cd ../../
-
-# copy all the build files
-RUN cd libcstor && mkdir -p ./docker/zfs/bin ./docker/zfs/lib
-RUN cd libcstor && cp cmd/zrepl/.libs/zrepl ../cstor/cmd/zpool/.libs/zpool ../cstor/cmd/zfs/.libs/zfs ../cstor/cmd/zstreamdump/.libs/zstreamdump ./docker/zfs/bin
-RUN cd libcstor && cp ../cstor/lib/libzpool/.libs/*.so* ../cstor/lib/libuutil/.libs/*.so* ../cstor/lib/libnvpair/.libs/*.so* ../cstor/lib/libzfs/.libs/*.so* ../cstor/lib/libzfs_core/.libs/*.so* src/.libs/*.so* ./docker/zfs/lib
+# build using script
+RUN ./docker/build.sh
 
 #Final
 FROM ubuntu:bionic-20200219
@@ -90,9 +54,6 @@ RUN if [ "$TARGETARCH" != "arm64" ]; then \
 
 RUN apt-get -y install apt-file && apt-file update
 
-COPY --from=build libcstor/docker/zfs/bin/* /usr/local/bin/
-COPY --from=build libcstor/docker/zfs/lib/* /usr/lib/
-
 ARG DBUILD_DATE
 ARG DBUILD_REPO_URL
 ARG DBUILD_SITE_URL
@@ -103,5 +64,8 @@ LABEL org.label-schema.schema-version="1.0"
 LABEL org.label-schema.build-date=$DBUILD_DATE
 LABEL org.label-schema.vcs-url=$DBUILD_REPO_URL
 LABEL org.label-schema.url=$DBUILD_SITE_URL
+
+COPY --from=build libcstor/docker/zfs/bin/* /usr/local/bin/
+COPY --from=build libcstor/docker/zfs/lib/* /usr/lib/
 
 EXPOSE 7676
