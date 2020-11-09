@@ -30,7 +30,7 @@ git clone https://github.com/openebs/cstor.git && \
 # build libcstor 
 sh autogen.sh && \
     ./configure --with-zfs-headers=$PWD/cstor/include --with-spl-headers=$PWD/cstor/lib/libspl/include  && \
-    make -j4 && \
+    make -j$(nproc) && \
     make install && \
     ldconfig
 
@@ -39,7 +39,7 @@ cd cstor && \
     sh autogen.sh && \
     ./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor=$PWD/../include && \
     make clean && \
-    make -j4 && \
+    make -j$(nproc) && \
     cd /libcstor
 
 # build zrepl
