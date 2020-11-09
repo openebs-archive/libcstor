@@ -122,7 +122,7 @@ cd docker && \
  cd ..
 
 if [ "${ARCH}" = "x86_64" ]; then
-	REPO_NAME="$IMAGE_ORG/cstor-pool"
+	REPO_NAME="$IMAGE_ORG/cstor-pool-amd64"
 elif [ "${ARCH}" = "aarch64" ]; then
 	REPO_NAME="$IMAGE_ORG/cstor-pool-arm64"
 fi 
