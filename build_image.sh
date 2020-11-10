@@ -81,7 +81,7 @@ DBUILD_ARGS="--build-arg DBUILD_DATE=${DBUILD_DATE} --build-arg DBUILD_REPO_URL=
 
 
 if [ "${ARCH}" = "x86_64" ]; then
-	REPO_NAME="$IMAGE_ORG/cstor-base"
+	REPO_NAME="$IMAGE_ORG/cstor-base-amd64"
 	DOCKERFILE_BASE="Dockerfile.base"
 	DOCKERFILE="Dockerfile"
 elif [ "${ARCH}" = "aarch64" ]; then
