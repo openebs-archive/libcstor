@@ -1,3 +1,19 @@
+v2.3.0 / 2020-11-14
+========================
+* chore(build): add support for multiarch build  ([#71](https://github.com/openebs/libcstor/pull/71),[@shubham14bajpai](https://github.com/shubham14bajpai))
+* fix(travis): add suffix to single arch image pushed by travis ([#78](https://github.com/openebs/libcstor/pull/78),[@shubham14bajpai](https://github.com/shubham14bajpai))
+
+
+v2.3.0-RC2 / 2020-11-13
+========================
+
+
+v2.3.0-RC1 / 2020-11-12
+========================
+* chore(build): add support for multiarch build  ([#71](https://github.com/openebs/libcstor/pull/71),[@shubham14bajpai](https://github.com/shubham14bajpai))
+* fix(travis): add suffix to single arch image pushed by travis ([#78](https://github.com/openebs/libcstor/pull/78),[@shubham14bajpai](https://github.com/shubham14bajpai))
+
+
 v2.2.0 / 2020-10-13
 ========================
 
