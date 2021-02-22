@@ -55,7 +55,11 @@ static int inline uzfs_ioctl_init(uzfs_ioctl_t *cmd, zfs_cmd_t *zc)
 		zc->zc_nvlist_src = (uint64_t)ptr;
 	}
 	if (zc->zc_nvlist_dst_size) {
-		ptr = malloc(zc->zc_nvlist_dst_size);
+		uint64_t alloc_size = zc->zc_nvlist_dst_size;
+		if (cmd->ioc_num == ZFS_IOC_ERROR_LOG) {
+			alloc_size *= sizeof (zbookmark_phys_t);
+		}
+		ptr = malloc(alloc_size);
 		if (ptr == NULL)
 			goto err;
 		zc->zc_nvlist_dst = (uint64_t)ptr;

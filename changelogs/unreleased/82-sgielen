@@ -1,0 +1,1 @@
+Fix zc_nvlist_dst buffer allocation when ioctl is ZFS_IOC_ERROR_LOG.
