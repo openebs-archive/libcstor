@@ -1,3 +1,17 @@
+v2.7.0 / 2021-03-11
+========================
+* Fix zc_nvlist_dst buffer allocation when ioctl is ZFS_IOC_ERROR_LOG. ([#82](https://github.com/openebs/libcstor/pull/82),[@sgielen](https://github.com/sgielen))
+
+
+v2.7.0-RC2 / 2021-03-10
+========================
+
+
+v2.7.0-RC1 / 2021-03-08
+========================
+* Fix zc_nvlist_dst buffer allocation when ioctl is ZFS_IOC_ERROR_LOG. ([#82](https://github.com/openebs/libcstor/pull/82),[@sgielen](https://github.com/sgielen))
+
+
 v2.6.0 / 2021-02-13
 ========================
 
