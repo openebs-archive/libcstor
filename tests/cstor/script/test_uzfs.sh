@@ -69,7 +69,7 @@ log_must()
 	status=$?
 
 	if [ $status -ne 0 ]; then
-		cat $logfile > /dev/tty 2>&1
+		cat $logfile
 		rm $logfile
 		log_fail $@
 	fi
