@@ -16,12 +16,15 @@ name: ci
 
 on:
   pull_request:
-    paths-ignore:
-      - 'changelogs/**'
     branches:
       # on pull requests to master and release branches
-      - master
+      - 'master'
       - 'v*'
+    paths-ignore:
+      - '*.md'
+      - 'changelogs/**'
+      - 'LICENSE'
+      - 'MAINTAINERS'
 
 jobs:
   lint:
