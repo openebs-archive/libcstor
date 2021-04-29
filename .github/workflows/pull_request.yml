@@ -60,7 +60,11 @@ jobs:
           version: v0.5.1
 
       - name: Build Image
-        env:
-          IMG_RESULT: cache
-        run: make -f Makefile.buildx.mk docker.buildx.cstor-base
-
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./docker/cstor-base.Dockerfile
+          push: false
+          platforms: linux/amd64, linux/arm64
+          tags: |
+            openebs/cstor-base:ci
