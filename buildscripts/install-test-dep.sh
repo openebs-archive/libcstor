@@ -14,6 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if [ -z "${REPO_ORG}" ]; then
+  echo "REPO_ORG variable not set. Required for fetching dependent build repositories"
+  exit 1
+else
+  echo "Using repository organization: ${REPO_ORG}"
+fi
+
+if [ -z "${BRANCH}" ]; then
+  echo "BRANCH variable not set. Required for checking out libcstor repository"
+  exit 1
+else
+  echo "Using branch: ${BRANCH} for libcstor"
+fi
+
 #zrepl will make use of /var/tmp/sock directory to create a sock file.
 mkdir -p /var/tmp/sock
 pushd .
@@ -40,9 +54,7 @@ sh autogen.sh
 make -j4
 cd ..
 # we need cstor headers
-# Get base name of from where we need to download cstor
-repo_org=${PWD##*/}
-git clone https://github.com/${repo_org}/cstor.git
+git clone https://github.com/${REPO_ORG}/cstor.git
 cd cstor || exit 1
 if [ "${BRANCH}" == "master" ]; then
   git checkout develop
