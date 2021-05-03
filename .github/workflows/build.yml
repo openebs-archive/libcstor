@@ -54,7 +54,7 @@ jobs:
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
 
       - name: Install Tool dependencies
-        run: buildscripts/install-tool-deps.sh
+        run: buildscripts/install-tool-dep.sh
 
       - name: Install Test dependencies
         run: buildscripts/install-test-dep.sh
