@@ -64,6 +64,7 @@ jobs:
       - name: Run ztest and test supported zio backends
         run: |
           export FIO_SRCDIR=$PWD/../fio
+          echo $PWD
           sudo bash ./print_debug_info.sh &
           sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || exit 1
 

@@ -91,3 +91,4 @@ cd ../../
 # back to cstor for running further tests.
 cd ..
 cd cstor || exit 1
+echo $PWD
