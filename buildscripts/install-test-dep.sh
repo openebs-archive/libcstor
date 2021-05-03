@@ -87,8 +87,3 @@ make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
 # Go to zrepl directory to build zrepl related targets
 cd cmd/zrepl || exit 1
 make
-cd ../../
-# back to cstor for running further tests.
-cd ..
-cd cstor || exit 1
-echo $PWD
