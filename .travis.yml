@@ -107,7 +107,6 @@ script:
     # run ztest and test supported zio backends
     - if [ $RUN_UZFS_TESTS = 1 ]; then
         export FIO_SRCDIR=$PWD/../fio;
-        echo $PWD;
         sudo bash ./print_debug_info.sh &
         sudo bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || travis_terminate 1;
       fi
