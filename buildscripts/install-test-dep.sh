@@ -36,9 +36,11 @@ sudo cmake CMakeLists.txt
 sudo make -j4
 sudo cp *.a /usr/lib
 popd || exit 1
+
 # save the current location to get back
 pushd .
 cd ..
+
 # we need fio repo to build zfs replica fio engine
 git clone https://github.com/axboe/fio
 cd fio || exit 1
@@ -53,6 +55,7 @@ sh autogen.sh
 ./configure
 make -j4
 cd ..
+
 # we need cstor headers
 git clone https://github.com/${REPO_ORG}/cstor.git
 cd cstor || exit 1
@@ -79,11 +82,12 @@ sh autogen.sh
 ./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
 make -j4;
 
-# Return to libcstor code to complie zrepl which contains main process and to run lint checks
+# Return to libcstor code to compile zrepl which contains main process and to run lint checks
 cd ..
 cd libcstor || exit 1
 make check-license
 make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
+
 # Go to zrepl directory to build zrepl related targets
 cd cmd/zrepl || exit 1
 make
