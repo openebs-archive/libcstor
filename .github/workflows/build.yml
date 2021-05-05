@@ -43,6 +43,8 @@ jobs:
           pattern: '*.sh'
 
   test:
+    # to ignore tests on release
+    if: ${{ (github.event.ref_type != 'tag') }}
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout
