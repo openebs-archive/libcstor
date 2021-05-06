@@ -34,7 +34,7 @@ pushd .
 cd /usr/src/gtest || exit 1
 sudo cmake CMakeLists.txt
 sudo make -j4
-sudo cp *.a /usr/lib
+sudo cp ./*.a /usr/lib
 popd || exit 1
 
 # save the current location to get back
@@ -57,12 +57,12 @@ make -j4
 cd ..
 
 # we need cstor headers
-git clone https://github.com/${REPO_ORG}/cstor.git
+git clone "https://github.com/${REPO_ORG}/cstor.git"
 cd cstor || exit 1
 if [ "${BRANCH}" == "master" ]; then
   git checkout develop
 else
-  git checkout ${BRANCH} || git checkout develop
+  git checkout "${BRANCH}" || git checkout develop
 fi
 
 git branch
@@ -70,7 +70,7 @@ git branch
 # Return to libcstor code base
 popd || exit 1
 sh autogen.sh
-./configure --enable-debug --with-zfs-headers=$PWD/../cstor/include --with-spl-headers=$PWD/../cstor/lib/libspl/include
+./configure --enable-debug --with-zfs-headers="$PWD/../cstor/include" --with-spl-headers="$PWD/../cstor/lib/libspl/include"
 make -j4
 sudo make install
 sudo ldconfig
@@ -79,14 +79,14 @@ sudo ldconfig
 cd ..
 cd cstor || exit 1
 sh autogen.sh
-./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio=$PWD/../fio --with-libcstor=$PWD/../libcstor/include
+./configure --with-config=user  --enable-debug --enable-uzfs=yes --with-jemalloc --with-fio="$PWD/../fio" --with-libcstor="$PWD/../libcstor/include"
 make -j4;
 
 # Return to libcstor code to compile zrepl which contains main process and to run lint checks
 cd ..
 cd libcstor || exit 1
 make check-license
-make -f ../cstor/Makefile cstyle CSTORDIR=$PWD/../cstor
+make -f ../cstor/Makefile cstyle CSTORDIR="$PWD/../cstor"
 
 # Go to zrepl directory to build zrepl related targets
 cd cmd/zrepl || exit 1
