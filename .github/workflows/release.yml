@@ -191,6 +191,7 @@ jobs:
           tag-name: ${{ github.ref }}
           body: 'Release created from libcstor'
           repo: |
+            m-exporter
             istgt
           # GR_TOKEN secret is the access token to perform github releases
           github-token: ${{ secrets.GR_TOKEN }}
