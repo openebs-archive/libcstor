@@ -41,6 +41,32 @@ jobs:
           path: '.'
           pattern: '*.sh'
 
+  test:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Branch
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+          REPO_ORG=${{ github.repository_owner }}
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "REPO_ORG=${REPO_ORG}" >> $GITHUB_ENV
+
+      - name: Install Tool dependencies
+        run: buildscripts/install-tool-dep.sh
+
+      - name: Install Test dependencies
+        run: buildscripts/install-test-dep.sh
+
+      - name: Run ztest and test supported zio backends
+        # move to cstor directory to run the tests
+        run: |
+          cd ../cstor
+          sudo bash ./print_debug_info.sh &
+          sudo FIO_SRCDIR=$PWD/../fio bash ../libcstor/tests/cstor/script/test_uzfs.sh -T all || exit 1
+
   cstor-base:
     runs-on: ubuntu-latest
     needs: ['lint']
