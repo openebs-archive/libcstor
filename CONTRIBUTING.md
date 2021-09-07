@@ -8,7 +8,7 @@ You can contribute to libcstor by filling an issue at [openebs/libcstor](https:/
 
 * If you want to file an issue for bug or feature request, please see [Filing an issue](#filing-an-issue)
 * If you are a first-time contributor, please see [Steps to Contribute](#steps-to-contribute) and code standard(code-standard.md).
-* If you would like to work on something more involved, please connect with the OpenEBS Contributors. See [OpenEBS Community](https://github.com/openebs/openebs/tree/master/community)
+* If you would like to work on something more involved, please connect with the OpenEBS Contributors. See [OpenEBS Community](https://github.com/openebs/openebs/tree/HEAD/community)
 
 ## Filing an issue
 ### Before filing an issue
@@ -94,7 +94,7 @@ For setting up a development environment on your local machine, see the detailed
 ## Code Reviews
 All submissions, including submissions by project members, require review. We use GitHub pull requests for this purpose. Consult [GitHub Help](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-requests) for more information on using pull requests.
 
-* If your PR is not getting reviewed or you need a specific person to review it, please reach out to the OpenEBS Contributors. See [OpenEBS Community](https://github.com/openebs/openebs/tree/master/community)
+* If your PR is not getting reviewed or you need a specific person to review it, please reach out to the OpenEBS Contributors. See [OpenEBS Community](https://github.com/openebs/openebs/tree/HEAD/community)
 
 * If PR is fixing any issues from [github-issues](github.com/openebs/libcstor/issues) then you need to mention the issue number with a link in the PR description. like: _fixes https://github.com/openebs/libcstor/issues/56_
 
