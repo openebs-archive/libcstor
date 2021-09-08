@@ -59,7 +59,7 @@ cd ..
 # we need cstor headers
 git clone "https://github.com/${REPO_ORG}/cstor.git"
 cd cstor || exit 1
-if [ "${BRANCH}" == "master" ]; then
+if [ "${BRANCH}" == "develop" ]; then
   git checkout develop
 else
   git checkout "${BRANCH}" || git checkout develop
