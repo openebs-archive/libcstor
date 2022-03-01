@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ -z "${REPO_ORG}" ]; then
-  echo "REPO_ORG variable not set. Required for fetching dependent build repositories"
+if [ -z "${CSTOR_ORG}" ]; then
+  echo "CSTOR_ORG variable not set. Required for fetching dependent build repositories"
   exit 1
 else
-  echo "Using repository organization: ${REPO_ORG}"
+  echo "Using repository organization: ${CSTOR_ORG}"
 fi
 
 if [ -z "${BRANCH}" ]; then
@@ -57,7 +57,7 @@ make -j4
 cd ..
 
 # we need cstor headers
-git clone "https://github.com/${REPO_ORG}/cstor.git"
+git clone "https://github.com/${CSTOR_ORG}/cstor.git"
 cd cstor || exit 1
 if [ "${BRANCH}" == "develop" ]; then
   git checkout develop

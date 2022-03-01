@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+CSTOR_ORG="mayadata-io"
+
 # enable gtest for builds
 cd /usr/src/gtest && \
     cmake -DBUILD_SHARED_LIBS=ON CMakeLists.txt && \
@@ -22,7 +24,7 @@ cd /usr/src/gtest && \
     cd /libcstor
 
 # clone cstor repo for required library files
-git clone https://github.com/openebs/cstor.git && \ 
+git clone https://github.com/$CSTOR_ORG/cstor.git && \
     cd cstor && \
     git checkout develop && \
     cd .. 
