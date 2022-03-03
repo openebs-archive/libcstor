@@ -121,6 +121,11 @@ jobs:
         with:
           platforms: all
 
+      - name: Set Repo Org
+        run: |
+          CSTOR_ORG="mayadata-io"
+          echo "CSTOR_ORG=${CSTOR_ORG}" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
@@ -161,6 +166,7 @@ jobs:
             DBUILD_REPO_URL=https://github.com/openebs/libcstor
             DBUILD_SITE_URL=https://openebs.io
             BRANCH=${{ env.BRANCH }}
+            CSTOR_ORG=${{ env.CSTOR_ORG }}
 
   cstor:
     runs-on: ubuntu-latest

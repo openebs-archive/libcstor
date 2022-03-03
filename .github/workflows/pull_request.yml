@@ -79,6 +79,11 @@ jobs:
         with:
           platforms: all
 
+      - name: Set Repo Org
+        run: |
+          CSTOR_ORG="mayadata-io"
+          echo "CSTOR_ORG=${CSTOR_ORG}" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
@@ -94,3 +99,6 @@ jobs:
           platforms: linux/amd64, linux/arm64
           tags: |
             openebs/cstor-base:ci
+          build-args: |
+            CSTOR_ORG=${{ env.CSTOR_ORG }}
+

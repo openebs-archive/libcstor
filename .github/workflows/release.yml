@@ -44,6 +44,11 @@ jobs:
           echo "TAG=${TAG}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
 
+      - name: Set Repo Org
+        run: |
+          CSTOR_ORG="mayadata-io"
+          echo "CSTOR_ORG=${CSTOR_ORG}" >> $GITHUB_ENV
+
       - name: Docker meta
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
@@ -107,6 +112,7 @@ jobs:
             DBUILD_REPO_URL=https://github.com/openebs/libcstor
             DBUILD_SITE_URL=https://openebs.io
             RELEASE_TAG=${{ env.RELEASE_TAG }}
+            CSTOR_ORG=${{ env.CSTOR_ORG }}
 
   cstor:
     runs-on: ubuntu-latest

@@ -14,7 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CSTOR_ORG="mayadata-io"
+if [ -z "${CSTOR_ORG}" ]; then
+  echo "CSTOR_ORG variable not set. Required for fetching dependent build repositories"
+  exit 1
+else
+  echo "Using cstor organization: ${CSTOR_ORG}"
+fi
+
 
 # enable gtest for builds
 cd /usr/src/gtest && \
@@ -31,17 +37,17 @@ git clone https://github.com/$CSTOR_ORG/cstor.git && \
 
 # build libcstor 
 sh autogen.sh && \
-    ./configure --with-zfs-headers=$PWD/cstor/include --with-spl-headers=$PWD/cstor/lib/libspl/include  && \
-    make -j$(nproc) && \
+    ./configure --with-zfs-headers="$PWD"/cstor/include --with-spl-headers="$PWD"/cstor/lib/libspl/include  && \
+    make -j"$(nproc)" && \
     make install && \
     ldconfig
 
 # build cstor
 cd cstor && \
     sh autogen.sh && \
-    ./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor=$PWD/../include && \
+    ./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor="$PWD"/../include && \
     make clean && \
-    make -j$(nproc) && \
+    make -j"$(nproc)" && \
     cd /libcstor
 
 # build zrepl
