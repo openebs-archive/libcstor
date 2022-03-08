@@ -14,6 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if [ -z "${CSTOR_ORG}" ]; then
+  echo "CSTOR_ORG variable not set. Required for fetching dependent build repositories"
+  exit 1
+else
+  echo "Using cstor organization: ${CSTOR_ORG}"
+fi
+
+
 # enable gtest for builds
 cd /usr/src/gtest && \
     cmake -DBUILD_SHARED_LIBS=ON CMakeLists.txt && \
@@ -22,24 +30,24 @@ cd /usr/src/gtest && \
     cd /libcstor
 
 # clone cstor repo for required library files
-git clone https://github.com/openebs/cstor.git && \ 
+git clone https://github.com/$CSTOR_ORG/cstor.git && \
     cd cstor && \
     git checkout develop && \
     cd .. 
 
 # build libcstor 
 sh autogen.sh && \
-    ./configure --with-zfs-headers=$PWD/cstor/include --with-spl-headers=$PWD/cstor/lib/libspl/include  && \
-    make -j$(nproc) && \
+    ./configure --with-zfs-headers="$PWD"/cstor/include --with-spl-headers="$PWD"/cstor/lib/libspl/include  && \
+    make -j"$(nproc)" && \
     make install && \
     ldconfig
 
 # build cstor
 cd cstor && \
     sh autogen.sh && \
-    ./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor=$PWD/../include && \
+    ./configure --enable-uzfs=yes --with-config=user --with-jemalloc --with-libcstor="$PWD"/../include && \
     make clean && \
-    make -j$(nproc) && \
+    make -j"$(nproc)" && \
     cd /libcstor
 
 # build zrepl

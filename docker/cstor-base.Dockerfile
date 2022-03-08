@@ -30,6 +30,7 @@ RUN apt-get update -qq && \
     unlink /usr/bin/gcc && ln -s /usr/bin/gcc-6 /usr/bin/gcc && \
     unlink /usr/bin/g++ && ln -s /usr/bin/g++-6 /usr/bin/g++ 
 
+ARG CSTOR_ORG
 # build using script
 RUN ./docker/build.sh
 

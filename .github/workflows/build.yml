@@ -53,9 +53,9 @@ jobs:
       - name: Set Branch
         run: |
           BRANCH="${GITHUB_REF##*/}"
-          REPO_ORG=${{ github.repository_owner }}
+          CSTOR_ORG="mayadata-io"
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
-          echo "REPO_ORG=${REPO_ORG}" >> $GITHUB_ENV
+          echo "CSTOR_ORG=${CSTOR_ORG}" >> $GITHUB_ENV
 
       - name: Install Tool dependencies
         run: buildscripts/install-tool-dep.sh
@@ -121,6 +121,11 @@ jobs:
         with:
           platforms: all
 
+      - name: Set Repo Org
+        run: |
+          CSTOR_ORG="mayadata-io"
+          echo "CSTOR_ORG=${CSTOR_ORG}" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
@@ -161,6 +166,7 @@ jobs:
             DBUILD_REPO_URL=https://github.com/openebs/libcstor
             DBUILD_SITE_URL=https://openebs.io
             BRANCH=${{ env.BRANCH }}
+            CSTOR_ORG=${{ env.CSTOR_ORG }}
 
   cstor:
     runs-on: ubuntu-latest
