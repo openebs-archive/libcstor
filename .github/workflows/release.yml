@@ -59,8 +59,7 @@ jobs:
             quay.io/${{ env.IMAGE_ORG }}/cstor-base
             ghcr.io/${{ env.IMAGE_ORG }}/cstor-base
           tags: |
-            type=raw,value=latest,enable=true
-            type=raw,value={{version}}
+            type=semver,pattern={{version}}
 
       - name: Print Tag info
         run: |
@@ -148,8 +147,7 @@ jobs:
             quay.io/${{ env.IMAGE_ORG }}/cstor-pool
             ghcr.io/${{ env.IMAGE_ORG }}/cstor-pool
           tags: |
-            type=raw,value=latest,enable=true
-            type=raw,value={{version}}
+            type=semver,pattern={{version}}
 
       - name: Print Tag info
         run: |
